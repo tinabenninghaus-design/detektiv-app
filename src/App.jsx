@@ -3,20 +3,10 @@ import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Circle } from "react-leaflet";
 import { keksformelKappelMission } from "./missions/keksformel-kappel";
 
-const missions = {
-  "keksformel-kappel": keksformelKappelMission,
-};
-
-function getMissionFromUrl() {
-  const path = window.location.pathname;
-  const slug = path.split("/m/")[1]?.split("/")[0];
-  return missions[slug] || keksformelKappelMission;
-}
-
-const mission = getMissionFromUrl();
-
+const mission = keksformelKappelMission;
 const DEMO_ACCESS_CODE = mission.demoAccessCode;
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const MAPBOX_TOKEN =
+  "pk.eyJ1IjoiZGVyLXNwaWVsemV1Z2xhZGVuIiwiYSI6ImNtbzkxMXBlbDA0aDEycXM4YjBqaHA0dWsifQ.YuTkhtwhyDXY3jMz8najbw";
 const START_MAPS_URL = mission.startMapsUrl;
 
 function MapHint({ lat, lng, radius, title }) {
@@ -180,31 +170,36 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
   );
 }
 
-function HintCard({ title, text, image, onImageClick }) {
-  const hintImages = Array.isArray(image) ? image.filter(Boolean) : image ? [image] : [];
-
+function HintCard({ title, text, image, image2, onImageClick, onImage2Click }) {
   return (
     <div style={styles.hintCard}>
       <div style={styles.hintCardTitle}>{title}</div>
-      {hintImages.length > 0 ? (
+      {image ? (
         <div style={styles.hintImageWrap}>
-          {hintImages.map((imageSrc, index) => (
-            <img
-              key={imageSrc}
-              src={imageSrc}
-              alt={hintImages.length > 1 ? `${title} ${index + 1}` : title}
-              style={{
-                ...styles.hintImage,
-                marginBottom: index < hintImages.length - 1 ? "10px" : 0,
-                cursor: onImageClick ? "zoom-in" : "default",
-              }}
-              onClick={onImageClick}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          ))}
+          <img
+            src={image}
+            alt={title}
+            style={{ ...styles.hintImage, cursor: onImageClick ? "zoom-in" : "default" }}
+            onClick={onImageClick}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
           {onImageClick ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
+        </div>
+      ) : null}
+      {image2 ? (
+        <div style={styles.hintImageWrap}>
+          <img
+            src={image2}
+            alt={`${title} 2`}
+            style={{ ...styles.hintImage, cursor: onImage2Click ? "zoom-in" : "default" }}
+            onClick={onImage2Click}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          {onImage2Click ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
         </div>
       ) : null}
       <TextLines text={text} style={styles.hintCardText} />
@@ -492,10 +487,15 @@ const pages = [
     hint1Text:
       "Schaut euch an, wo man sich gut verstecken könnte…",
     hint1Image: null,
-    hint2Title: "Noch ein Tipp",
+    hint2Title: "Hinweis zum Treffpunkt",
+    hint2ButtonText: "👀 Hinweis zum Treffpunkt anzeigen",
     hint2Text:
-      "Der Spion flüstert…\n\n„Nicht nur das Versteck ist wichtig…\nschaut euch auch darum herum um…“",
-    hint2Image: null,
+      "Der Spion flüstert…
+
+„Nicht nur das Versteck ist wichtig…
+schaut euch auch darum herum um…“",
+    hint2Image: "/hinweis6-treffpunkt-1.jpeg",
+    hint2Image2: "/hinweis6-treffpunkt-2.jpeg",
     solutionText: "Die richtige Lösung ist: Elefant",
     answerKey: "tier",
     correctAnswers: ["elefant", "Elefant"],
@@ -558,25 +558,44 @@ const pages = [
     audio: "/meister-flucht.mp3",
     audioTitle: "🎧 Lauscht Meister der Krümel",
     taskText:
-      "Auf der Dose ist ein besonderes Schloss.\n\nNur wer die richtige Kombination kennt,\nkann die geheime Keksformel retten!\n\nErinnert euch an die drei wichtigsten Hinweise:\n\ndie Zahl, das Tier und das Zeichen.",
+      "Auf der Dose ist ein besonderes Schloss.\n\nNur wer die richtige Kombination kennt,\nkann die Dose öffnen.\n\nErinnert euch an die drei wichtigsten Hinweise:\n\ndie Zahl, das Tier und das Zeichen.",
     successBox:
       "KLICK...\n\nDas Schloss springt auf!\n\nIhr öffnet vorsichtig die Dose...\n\n😳\n\nHIER IST SIE!\n\nDie geheime Keksformel!\n\nMeister der Krümel ist zwar entkommen...\n\naber das Wichtigste habt ihr gerettet!\n\n🎉 Glückwunsch, Detektive!",
   },
   {
     id: "recipe",
     type: "recipe",
-    title: "MISSION",
-    titleLine2: "BIS ZUM NÄCHSTEN EINSATZ",
+    title: "",
+    titleLine2: "",
     outroText:
-      "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne seine wichtigste Spur!\n\nWir hoffen, ihr hattet ein tolles Abenteuer als Detektiv-Team.",
+      "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.
+
+Er ist zwar entkommen…
+
+aber ohne das geheime Rezept!
+
+Jetzt kann er nie wieder seine leckeren Kekse backen.
+
+Der Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
     photoText:
-      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.\n\nMarkiert uns oder nutzt den Hashtag:\n#geheimekeksformel\n\nSo sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
+      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.
+
+Markiert uns oder nutzt den Hashtag:
+#geheimekeksformel
+
+So sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
     reviewText:
-      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
+      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.
+
+Das hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
     returnText:
-      "Ihr steht jetzt fast wieder am Startpunkt.\n\nWenn ihr zurück zur Kirche möchtet, folgt einfach dem Weg zurück Richtung Ortsmitte – von hier aus ist es nur ein kurzes Stück.",
+      "Ihr steht jetzt fast wieder am Startpunkt.
+
+Wenn ihr zurück zur Kirche möchtet, folgt einfach dem Weg zurück Richtung Ortsmitte – von hier aus ist es nur ein kurzes Stück.",
     finalText:
-      "Bis zum nächsten Abenteuer, Detektive!\n\n🕵️‍♀️🍪🕵️",
+      "Bis zum nächsten Abenteuer, Detektive!
+
+🕵️‍♀️🍪🕵️",
   },
 ];
 
@@ -635,66 +654,10 @@ function loadSavedGame() {
   }
 }
 
-
-async function redeemAccessCode({ code, missionSlug }) {
-  const trimmedCode = String(code || "").trim();
-
-  if (!trimmedCode) {
-    return {
-      success: false,
-      message: "Bitte gebt einen Zugangscode ein.",
-    };
-  }
-
-  const supabaseUrl = mission.supabaseUrl;
-  const supabaseAnonKey = mission.supabaseAnonKey;
-
-  if (
-    !supabaseUrl ||
-    !supabaseAnonKey ||
-    supabaseAnonKey.includes("HIER_ANON_KEY")
-  ) {
-    // Lokaler Fallback, damit die App während der Einrichtung weiterhin testbar bleibt.
-    if (normalize(trimmedCode) === normalize(DEMO_ACCESS_CODE)) {
-      return { success: true, mode: "demo" };
-    }
-
-    return {
-      success: false,
-      message: "Supabase ist noch nicht vollständig eingerichtet.",
-    };
-  }
-
-  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/redeem_access_code`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
-    },
-    body: JSON.stringify({
-      p_code: trimmedCode,
-      p_mission_slug: missionSlug,
-    }),
-  });
-
-  if (!response.ok) {
-    return {
-      success: false,
-      message: "Die Code-Prüfung ist gerade nicht erreichbar. Bitte versucht es erneut.",
-    };
-  }
-
-  return response.json();
-}
-
 export default function App() {
   const savedGame = loadSavedGame();
-  const hasSavedAccess = savedGame?.accessGranted === true;
-  const [accessGranted, setAccessGranted] = useState(hasSavedAccess);
-  const [isRedeemingCode, setIsRedeemingCode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(hasSavedAccess ? savedGame?.currentPage ?? 0 : 0);
-  const [answers, setAnswers] = useState(hasSavedAccess ? savedGame?.answers ?? initialAnswers : initialAnswers);
+  const [currentPage, setCurrentPage] = useState(savedGame?.currentPage ?? 0);
+  const [answers, setAnswers] = useState(savedGame?.answers ?? initialAnswers);
   const [solved, setSolved] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
   const [hintLevel, setHintLevel] = useState(0);
@@ -707,7 +670,7 @@ export default function App() {
   const [showPlan, setShowPlan] = useState(false);
   const [zoomImage, setZoomImage] = useState(null);
   const [zoomTitle, setZoomTitle] = useState("");
-  const [planAssembled, setPlanAssembled] = useState(hasSavedAccess ? savedGame?.planAssembled ?? false : false);
+  const [planAssembled, setPlanAssembled] = useState(savedGame?.planAssembled ?? false);
 
   const [finaleRevealShown, setFinaleRevealShown] = useState(false);
   const [finaleLockShown, setFinaleLockShown] = useState(false);
@@ -772,7 +735,7 @@ export default function App() {
   };
 
   const restartMissionWithNewCode = () => {
-    if (!window.confirm("Möchtet ihr wirklich zurück zum Start und einen neuen Einsatz-Code eingeben?")) {
+    if (!window.confirm("Möchtet ihr diese Mission wirklich nochmal starten und einen neuen Einsatz-Code eingeben?")) {
       return;
     }
 
@@ -780,14 +743,18 @@ export default function App() {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
 
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+    }
+
     setAccessGranted(false);
+    setIsRedeemingCode(false);
     setCurrentPage(0);
     setAnswers(initialAnswers);
     setSolved(false);
     setShowSolution(false);
     setHintLevel(0);
     setAnswerError(false);
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoPreview(null);
     setChoiceError("");
     setWrongChoice("");
@@ -882,7 +849,6 @@ export default function App() {
       window.localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          accessGranted,
           currentPage,
           answers,
           planAssembled,
@@ -891,7 +857,7 @@ export default function App() {
     } catch {
       // Speicherung ist nicht verfügbar – die App läuft trotzdem weiter.
     }
-  }, [accessGranted, currentPage, answers, planAssembled]);
+  }, [currentPage, answers, planAssembled]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -1081,31 +1047,13 @@ export default function App() {
     setLockAttempts((prev) => prev + 1);
   };
 
-  const unlockMission = async () => {
-    if (isRedeemingCode) return;
-
-    setAccessError("");
-    setIsRedeemingCode(true);
-
-    try {
-      const result = await redeemAccessCode({
-        code: accessCode,
-        missionSlug: mission.slug,
-      });
-
-      if (result.success) {
-        setAccessGranted(true);
-        setAccessError("");
-        setCurrentPage(1);
-        return;
-      }
-
-      setAccessError(result.message || "Der Einsatz-Code ist leider nicht korrekt.");
-    } catch {
-      setAccessError("Die Code-Prüfung ist gerade nicht erreichbar. Bitte versucht es erneut.");
-    } finally {
-      setIsRedeemingCode(false);
+  const unlockMission = () => {
+    if (normalize(accessCode) === normalize(DEMO_ACCESS_CODE)) {
+      setAccessError("");
+      setCurrentPage(1);
+      return;
     }
+    setAccessError("Der Einsatz-Code ist leider nicht korrekt.");
   };
 
   const nextPage = () => {
@@ -1187,22 +1135,14 @@ export default function App() {
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 placeholder="Einsatz-Code eingeben"
-                disabled={isRedeemingCode}
               />
 
               <div style={styles.readyText}>
                 Seid ihr bereit, Meister der Krümel aufzuhalten?
               </div>
 
-              <button
-                style={{
-                  ...styles.startButton,
-                  ...(isRedeemingCode ? styles.primaryButtonDisabled : {}),
-                }}
-                onClick={unlockMission}
-                disabled={isRedeemingCode}
-              >
-                {isRedeemingCode ? "⏳ CODE WIRD GEPRÜFT..." : "🔓 MISSION FREISCHALTEN"}
+              <button style={styles.startButton} onClick={unlockMission}>
+                🔓 MISSION FREISCHALTEN
               </button>
 
               {accessError ? <div style={styles.accessErrorBox}>{accessError}</div> : null}
@@ -1522,9 +1462,15 @@ export default function App() {
                                   title={page.hint2Title}
                                   text={page.hint2Text}
                                   image={page.hint2Image}
+                                  image2={page.hint2Image2}
                                   onImageClick={
                                     page.hint2Image
                                       ? () => openZoom(page.hint2Image, page.hint2Title)
+                                      : null
+                                  }
+                                  onImage2Click={
+                                    page.hint2Image2
+                                      ? () => openZoom(page.hint2Image2, `${page.hint2Title} 2`)
                                       : null
                                   }
                                 />
@@ -1724,6 +1670,17 @@ export default function App() {
                             title={page.hint2Title}
                             text={page.hint2Text}
                             image={page.hint2Image}
+                            image2={page.hint2Image2}
+                            onImageClick={
+                              page.hint2Image
+                                ? () => openZoom(page.hint2Image, page.hint2Title)
+                                : null
+                            }
+                            onImage2Click={
+                              page.hint2Image2
+                                ? () => openZoom(page.hint2Image2, `${page.hint2Title} 2`)
+                                : null
+                            }
                           />
                         ) : null}
 
@@ -3502,59 +3459,6 @@ const styles = {
     marginTop: "14px",
     fontWeight: "bold",
   },
-  zoomOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.72)",
-    zIndex: 9999,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "14px",
-  },
-  zoomModal: {
-    position: "relative",
-    width: "100%",
-    maxWidth: "900px",
-    maxHeight: "92vh",
-    background: "#fffdf8",
-    borderRadius: "20px",
-    padding: "14px",
-    border: "3px solid #ead8bd",
-    boxShadow: "0 12px 40px rgba(0,0,0,0.3)",
-    overflow: "auto",
-  },
-  zoomCloseButton: {
-    position: "absolute",
-    top: "8px",
-    right: "10px",
-    width: "42px",
-    height: "42px",
-    borderRadius: "50%",
-    border: "none",
-    background: "#a32020",
-    color: "#fff",
-    fontSize: "28px",
-    fontWeight: "900",
-    cursor: "pointer",
-    lineHeight: 1,
-  },
-  zoomTitle: {
-    textAlign: "center",
-    fontSize: "18px",
-    fontWeight: "900",
-    marginBottom: "12px",
-    color: "#2c2015",
-    paddingRight: "44px",
-  },
-  zoomImage: {
-    width: "100%",
-    maxHeight: "82vh",
-    objectFit: "contain",
-    display: "block",
-    borderRadius: "14px",
-    background: "#fff",
-  },
   socialButtonGrid: {
     display: "grid",
     gridTemplateColumns: "1fr",
@@ -3633,5 +3537,58 @@ const styles = {
     fontWeight: "900",
     cursor: "pointer",
     boxShadow: "0 4px 0 rgba(43,84,17,0.35)",
+  },
+  zoomOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.72)",
+    zIndex: 9999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "14px",
+  },
+  zoomModal: {
+    position: "relative",
+    width: "100%",
+    maxWidth: "900px",
+    maxHeight: "92vh",
+    background: "#fffdf8",
+    borderRadius: "20px",
+    padding: "14px",
+    border: "3px solid #ead8bd",
+    boxShadow: "0 12px 40px rgba(0,0,0,0.3)",
+    overflow: "auto",
+  },
+  zoomCloseButton: {
+    position: "absolute",
+    top: "8px",
+    right: "10px",
+    width: "42px",
+    height: "42px",
+    borderRadius: "50%",
+    border: "none",
+    background: "#a32020",
+    color: "#fff",
+    fontSize: "28px",
+    fontWeight: "900",
+    cursor: "pointer",
+    lineHeight: 1,
+  },
+  zoomTitle: {
+    textAlign: "center",
+    fontSize: "18px",
+    fontWeight: "900",
+    marginBottom: "12px",
+    color: "#2c2015",
+    paddingRight: "44px",
+  },
+  zoomImage: {
+    width: "100%",
+    maxHeight: "82vh",
+    objectFit: "contain",
+    display: "block",
+    borderRadius: "14px",
+    background: "#fff",
   },
 };
