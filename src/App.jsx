@@ -1554,13 +1554,13 @@ export default function App() {
                           <>
                             <label style={styles.uploadButton}>
                               📸 Teamfoto aufnehmen oder auswählen
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={styles.hiddenFileInput}
-                                onChange={handlePhotoChange}
-                              />
-                            </label>
+                          <input
+  type="file"
+  accept="image/*"
+  capture="user"
+  style={styles.hiddenFileInput}
+  onChange={handlePhotoChange}
+/>
 
                             {photoPreview ? (
                               <div style={styles.photoPreviewWrap}>
