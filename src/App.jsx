@@ -170,7 +170,7 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
   );
 }
 
-function HintCard({ title, text, image, image2, onImageClick, onImage2Click }) {
+function HintCard({ title, text, image, image2, onImageClick }) {
   return (
     <div style={styles.hintCard}>
       <div style={styles.hintCardTitle}>{title}</div>
@@ -188,22 +188,20 @@ function HintCard({ title, text, image, image2, onImageClick, onImage2Click }) {
           {onImageClick ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
         </div>
       ) : null}
-
       {image2 ? (
         <div style={styles.hintImageWrap}>
           <img
             src={image2}
             alt={title}
-            style={{ ...styles.hintImage, cursor: onImage2Click ? "zoom-in" : "default" }}
-            onClick={onImage2Click}
+            style={{ ...styles.hintImage, cursor: onImageClick ? "zoom-in" : "default" }}
+            onClick={onImageClick}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
           />
-          {onImage2Click ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
+          {onImageClick ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
         </div>
       ) : null}
-
       <TextLines text={text} style={styles.hintCardText} />
     </div>
   );
@@ -491,7 +489,10 @@ const pages = [
     hint1Image: null,
     hint2Title: "Hinweis zum Treffpunkt",
     hint2Text:
-      "Der Spion flüstert…\n\n„Nicht nur das Versteck ist wichtig…\nschaut euch auch darum herum ganz genau um…“",
+      "Der Spion flüstert…
+
+„Nicht nur das Versteck ist wichtig…
+schaut euch auch darum herum um…“",
     hint2Image: "/hinweis6-treffpunkt-1.jpeg",
     hint2Image2: "/hinweis6-treffpunkt-2.jpeg",
     solutionText: "Die richtige Lösung ist: Elefant",
@@ -556,7 +557,14 @@ const pages = [
     audio: "/meister-flucht.mp3",
     audioTitle: "🎧 Lauscht Meister der Krümel",
     taskText:
-      "Auf der Dose ist ein besonderes Schloss.\n\nNur wer die richtige Kombination kennt,\nkann die Dose öffnen.\n\nErinnert euch an die drei wichtigsten Hinweise:\n\ndie Zahl, das Tier und das Zeichen.",
+      "Auf der Dose ist ein besonderes Schloss.
+
+Nur wer die richtige Kombination kennt,
+kann die Dose öffnen.
+
+Erinnert euch an die drei wichtigsten Hinweise:
+
+die Zahl, das Tier und das Zeichen.",
     successBox:
       "KLICK...\n\nDas Schloss springt auf!\n\nIhr öffnet vorsichtig die Dose...\n\n😳\n\nHIER IST SIE!\n\nDie geheime Keksformel!\n\nMeister der Krümel ist zwar entkommen...\n\naber das Wichtigste habt ihr gerettet!\n\n🎉 Glückwunsch, Detektive!",
   },
@@ -566,15 +574,34 @@ const pages = [
     title: "",
     titleLine2: "",
     outroText:
-      "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne das geheime Rezept!\n\nJetzt kann er nie wieder seine leckeren Kekse backen.\n\nDer Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
+      "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.
+
+Er ist zwar entkommen…
+
+aber ohne das geheime Rezept!
+
+Jetzt kann er nie wieder seine leckeren Kekse backen.
+
+Der Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
     photoText:
-      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.\n\nMarkiert uns oder nutzt den Hashtag:\n#geheimekeksformel\n\nSo sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
+      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.
+
+Markiert uns oder nutzt den Hashtag:
+#geheimekeksformel
+
+So sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
     reviewText:
-      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
+      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.
+
+Das hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
     returnText:
-      "Ihr steht jetzt fast wieder am Startpunkt.\n\nWenn ihr zurück zur Kirche möchtet, folgt einfach dem Weg zurück Richtung Ortsmitte – von hier aus ist es nur ein kurzes Stück.",
+      "Ihr steht jetzt fast wieder am Startpunkt.
+
+Wenn ihr zurück zur Kirche möchtet, folgt einfach dem Weg zurück Richtung Ortsmitte – von hier aus ist es nur ein kurzes Stück.",
     finalText:
-      "Bis zum nächsten Abenteuer, Detektive!\n\n🕵️‍♀️🍪🕵️",
+      "Bis zum nächsten Abenteuer, Detektive!
+
+🕵️‍♀️🍪🕵️",
   },
 ];
 
@@ -714,13 +741,17 @@ export default function App() {
   };
 
   const restartMissionWithNewCode = () => {
-    if (!window.confirm("Möchtet ihr diese Mission wirklich nochmal starten und einen neuen Einsatz-Code eingeben?")) {
+    if (!window.confirm("Möchtet ihr diese Mission wirklich neu starten und einen neuen Einsatz-Code eingeben?")) {
       return;
     }
 
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
+
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+    }
 
     setAccessGranted(false);
     setCurrentPage(0);
@@ -729,6 +760,7 @@ export default function App() {
     setShowSolution(false);
     setHintLevel(0);
     setAnswerError(false);
+    setPhotoPreview(null);
     setChoiceError("");
     setWrongChoice("");
     setShowTaskMap(false);
@@ -752,11 +784,6 @@ export default function App() {
     setAccessCode("");
     setAccessError("");
     setArrivedAtStart(false);
-
-    if (photoPreview) {
-      URL.revokeObjectURL(photoPreview);
-      setPhotoPreview(null);
-    }
 
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   };
@@ -3192,7 +3219,7 @@ const styles = {
   },
   outroEmoji: {
     fontSize: "44px",
-    marginBottom: "22px",
+    marginBottom: "8px",
   },
   outroTitle: {
     fontSize: "26px",
@@ -3422,6 +3449,59 @@ const styles = {
     marginTop: "14px",
     fontWeight: "bold",
   },
+  zoomOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.72)",
+    zIndex: 9999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "14px",
+  },
+  zoomModal: {
+    position: "relative",
+    width: "100%",
+    maxWidth: "900px",
+    maxHeight: "92vh",
+    background: "#fffdf8",
+    borderRadius: "20px",
+    padding: "14px",
+    border: "3px solid #ead8bd",
+    boxShadow: "0 12px 40px rgba(0,0,0,0.3)",
+    overflow: "auto",
+  },
+  zoomCloseButton: {
+    position: "absolute",
+    top: "8px",
+    right: "10px",
+    width: "42px",
+    height: "42px",
+    borderRadius: "50%",
+    border: "none",
+    background: "#a32020",
+    color: "#fff",
+    fontSize: "28px",
+    fontWeight: "900",
+    cursor: "pointer",
+    lineHeight: 1,
+  },
+  zoomTitle: {
+    textAlign: "center",
+    fontSize: "18px",
+    fontWeight: "900",
+    marginBottom: "12px",
+    color: "#2c2015",
+    paddingRight: "44px",
+  },
+  zoomImage: {
+    width: "100%",
+    maxHeight: "82vh",
+    objectFit: "contain",
+    display: "block",
+    borderRadius: "14px",
+    background: "#fff",
+  },,
   socialButtonGrid: {
     display: "grid",
     gridTemplateColumns: "1fr",
@@ -3500,58 +3580,5 @@ const styles = {
     fontWeight: "900",
     cursor: "pointer",
     boxShadow: "0 4px 0 rgba(43,84,17,0.35)",
-  },
-  zoomOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.72)",
-    zIndex: 9999,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "14px",
-  },
-  zoomModal: {
-    position: "relative",
-    width: "100%",
-    maxWidth: "900px",
-    maxHeight: "92vh",
-    background: "#fffdf8",
-    borderRadius: "20px",
-    padding: "14px",
-    border: "3px solid #ead8bd",
-    boxShadow: "0 12px 40px rgba(0,0,0,0.3)",
-    overflow: "auto",
-  },
-  zoomCloseButton: {
-    position: "absolute",
-    top: "8px",
-    right: "10px",
-    width: "42px",
-    height: "42px",
-    borderRadius: "50%",
-    border: "none",
-    background: "#a32020",
-    color: "#fff",
-    fontSize: "28px",
-    fontWeight: "900",
-    cursor: "pointer",
-    lineHeight: 1,
-  },
-  zoomTitle: {
-    textAlign: "center",
-    fontSize: "18px",
-    fontWeight: "900",
-    marginBottom: "12px",
-    color: "#2c2015",
-    paddingRight: "44px",
-  },
-  zoomImage: {
-    width: "100%",
-    maxHeight: "82vh",
-    objectFit: "contain",
-    display: "block",
-    borderRadius: "14px",
-    background: "#fff",
   },
 };
