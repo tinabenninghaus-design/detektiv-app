@@ -181,29 +181,20 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
 }
 
 function HintCard({ title, text, image, onImageClick }) {
-  const hintImages = Array.isArray(image) ? image.filter(Boolean) : image ? [image] : [];
-
   return (
     <div style={styles.hintCard}>
       <div style={styles.hintCardTitle}>{title}</div>
-      {hintImages.length > 0 ? (
+      {image ? (
         <div style={styles.hintImageWrap}>
-          {hintImages.map((imageSrc, index) => (
-            <img
-              key={imageSrc}
-              src={imageSrc}
-              alt={hintImages.length > 1 ? `${title} ${index + 1}` : title}
-              style={{
-                ...styles.hintImage,
-                marginBottom: index < hintImages.length - 1 ? "10px" : 0,
-                cursor: onImageClick ? "zoom-in" : "default",
-              }}
-              onClick={onImageClick}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          ))}
+          <img
+            src={image}
+            alt={title}
+            style={{ ...styles.hintImage, cursor: onImageClick ? "zoom-in" : "default" }}
+            onClick={onImageClick}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
           {onImageClick ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
         </div>
       ) : null}
@@ -565,16 +556,14 @@ const pages = [
   {
     id: "recipe",
     type: "recipe",
-    title: "MISSION",
+    title: "ABSPANN",
     titleLine2: "BIS ZUM NÄCHSTEN EINSATZ",
     outroText:
-      "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne seine wichtigste Spur!\n\nWir hoffen, ihr hattet ein tolles Abenteuer als Detektiv-Team.",
+      "🎉 Geschafft!\n\nIhr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne seine wichtigste Spur!\n\nWir hoffen, ihr hattet ein tolles Abenteuer als Detektiv-Team.",
     photoText:
-      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.\n\nMarkiert uns oder nutzt den Hashtag:\n#geheimekeksformel\n\nSo sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
+      "📸 Wenn ihr möchtet, dürft ihr euer Teamfoto gerne auf Instagram teilen und uns markieren.\n\nSo sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
     reviewText:
-      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
-    returnText:
-      "Ihr steht jetzt fast wieder am Startpunkt.\n\nWenn ihr zurück zur Kirche möchtet, folgt einfach dem Weg zurück Richtung Ortsmitte – von hier aus ist es nur ein kurzes Stück.",
+      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft uns sehr – und vielleicht gibt es dann bald den nächsten Einsatz.",
     finalText:
       "Bis zum nächsten Abenteuer, Detektive!\n\n🕵️‍♀️🍪🕵️",
   },
@@ -769,51 +758,6 @@ export default function App() {
   const resetGameForTesting = () => {
     localStorage.removeItem(STORAGE_KEY);
     window.location.reload();
-  };
-
-  const restartMissionWithNewCode = () => {
-    if (!window.confirm("Möchtet ihr wirklich zurück zum Start und einen neuen Einsatz-Code eingeben?")) {
-      return;
-    }
-
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-
-    setAccessGranted(false);
-    setCurrentPage(0);
-    setAnswers(initialAnswers);
-    setSolved(false);
-    setShowSolution(false);
-    setHintLevel(0);
-    setAnswerError(false);
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoPreview(null);
-    setChoiceError("");
-    setWrongChoice("");
-    setShowTaskMap(false);
-    setShowNextMap(false);
-    setShowPlan(false);
-    setZoomImage(null);
-    setZoomTitle("");
-    setPlanAssembled(false);
-    setFinaleRevealShown(false);
-    setFinaleLockShown(false);
-    setInfoMenuOpen(false);
-    setActiveInfoPage("menu");
-    setLockLeft(1);
-    setLockAnimalIndex(0);
-    setLockSymbolIndex(0);
-    setLockOpened(false);
-    setLockAttempts(0);
-    setShowLockHint1(false);
-    setShowLockHint2(false);
-    setShowLockSolution(false);
-    setAccessCode("");
-    setAccessError("");
-    setArrivedAtStart(false);
-
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   };
 
   const handleSecretResetTouch = (event) => {
@@ -1344,26 +1288,24 @@ export default function App() {
           </>
         ) : (
           <>
-            {page.type !== "recipe" ? (
-              <div style={styles.headerTop}>
-                <div style={styles.characterClean}>
-                  <img
-                    src="/detektiv-zwei.png"
-                    alt="Detektiv"
-                    style={styles.characterImageClean}
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                </div>
-
-                <div style={styles.titleAreaWide}>
-                  <div style={styles.kicker}>{page.title}</div>
-                  {page.titleLine2 ? <h1 style={styles.mainTitle}>{page.titleLine2}</h1> : null}
-                  {page.titleLine3 ? <h1 style={styles.mainTitle}>{page.titleLine3}</h1> : null}
-                </div>
+            <div style={styles.headerTop}>
+              <div style={styles.characterClean}>
+                <img
+                  src="/detektiv-zwei.png"
+                  alt="Detektiv"
+                  style={styles.characterImageClean}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
-            ) : null}
+
+              <div style={styles.titleAreaWide}>
+                <div style={styles.kicker}>{page.title}</div>
+                {page.titleLine2 ? <h1 style={styles.mainTitle}>{page.titleLine2}</h1> : null}
+                {page.titleLine3 ? <h1 style={styles.mainTitle}>{page.titleLine3}</h1> : null}
+              </div>
+            </div>
 
             {showProgress ? (
               <div style={styles.progressWrap}>
@@ -1715,7 +1657,7 @@ export default function App() {
                             style={styles.secondaryButton}
                             onClick={() => setHintLevel(2)}
                           >
-                            {page.hint2ButtonText || "👀 Noch ein Tipp"}
+                            👀 Noch ein Tipp zum Fluchtplan
                           </button>
                         ) : null}
 
@@ -2067,68 +2009,14 @@ export default function App() {
                 <div style={styles.outroCard}>
                   <div style={styles.outroCardTitle}>Euer Teamfoto</div>
                   <TextLines text={page.photoText} style={styles.outroSmallText} />
-
-                  <div style={styles.socialButtonGrid}>
-                    <a
-                      href="https://www.instagram.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={styles.socialButton}
-                    >
-                      📸 Instagram öffnen
-                    </a>
-
-                    <a
-                      href="https://www.facebook.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={styles.socialButton}
-                    >
-                      👍 Facebook öffnen
-                    </a>
-                  </div>
-
-                  <div style={styles.hashtagBox}>
-                    Hashtag zum Kopieren:
-                    <br />
-                    <strong>#geheimekeksformel</strong>
-                  </div>
                 </div>
 
                 <div style={styles.outroCard}>
                   <div style={styles.outroCardTitle}>Hat euch die Mission gefallen?</div>
                   <TextLines text={page.reviewText} style={styles.outroSmallText} />
-
-                  <a
-                    href="https://g.page/r/DEIN-GOOGLE-BEWERTUNGSLINK/review"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={styles.reviewButton}
-                  >
-                    ⭐ Bewertung bei Google abgeben
-                  </a>
-
-                  <div style={styles.placeholderNote}>
-                    Hinweis für dich: Den Google-Link später durch deinen echten Bewertungslink ersetzen.
-                  </div>
                 </div>
 
-                <div style={styles.outroCard}>
-                  <div style={styles.outroCardTitle}>Zurück zum Startpunkt</div>
-                  <TextLines text={page.returnText} style={styles.outroSmallText} />
-                </div>
-
-                <div style={styles.outroRestartCard}>
-                  <TextLines text={page.finalText} style={styles.outroRestartText} />
-
-                  <button
-                    type="button"
-                    style={styles.restartMissionButton}
-                    onClick={restartMissionWithNewCode}
-                  >
-                    🔁 Diese Mission nochmal starten
-                  </button>
-                </div>
+                <TextLines text={page.finalText} style={styles.successBox} />
               </div>
             ) : null}
 
@@ -3272,7 +3160,7 @@ const styles = {
   },
   outroEmoji: {
     fontSize: "44px",
-    marginBottom: "20px",
+    marginBottom: "8px",
   },
   outroTitle: {
     fontSize: "26px",
@@ -3554,84 +3442,5 @@ const styles = {
     display: "block",
     borderRadius: "14px",
     background: "#fff",
-  },
-  socialButtonGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr",
-    gap: "10px",
-    marginTop: "16px",
-  },
-  socialButton: {
-    display: "block",
-    width: "100%",
-    background: "#fff",
-    color: "#2e6410",
-    textDecoration: "none",
-    borderRadius: "16px",
-    padding: "14px 18px",
-    fontSize: "17px",
-    fontWeight: "900",
-    textAlign: "center",
-    border: "3px solid #9bc56c",
-    boxSizing: "border-box",
-  },
-  hashtagBox: {
-    marginTop: "14px",
-    background: "#f7efe4",
-    border: "3px solid #e2d3be",
-    borderRadius: "16px",
-    padding: "14px",
-    fontSize: "16px",
-    lineHeight: 1.35,
-    textAlign: "center",
-    color: "#2c2015",
-  },
-  reviewButton: {
-    display: "block",
-    width: "100%",
-    marginTop: "16px",
-    background: "linear-gradient(180deg, #5b902c 0%, #3f6f1d 100%)",
-    color: "white",
-    textDecoration: "none",
-    borderRadius: "16px",
-    padding: "14px 18px",
-    fontSize: "17px",
-    fontWeight: "900",
-    textAlign: "center",
-    boxShadow: "0 4px 0 rgba(43,84,17,0.35)",
-    boxSizing: "border-box",
-  },
-  placeholderNote: {
-    marginTop: "10px",
-    fontSize: "13px",
-    color: "#7a6a58",
-    lineHeight: 1.35,
-    textAlign: "center",
-  },
-  outroRestartCard: {
-    background: "#f3f3f3",
-    border: "3px solid #dfdfdf",
-    borderRadius: "22px",
-    padding: "18px",
-    textAlign: "center",
-  },
-  outroRestartText: {
-    fontSize: "18px",
-    lineHeight: 1.4,
-    whiteSpace: "pre-line",
-    textAlign: "center",
-    marginBottom: "14px",
-  },
-  restartMissionButton: {
-    width: "100%",
-    background: "linear-gradient(180deg, #5b902c 0%, #3f6f1d 100%)",
-    color: "white",
-    border: "none",
-    borderRadius: "16px",
-    padding: "15px 18px",
-    fontSize: "17px",
-    fontWeight: "900",
-    cursor: "pointer",
-    boxShadow: "0 4px 0 rgba(43,84,17,0.35)",
   },
 };
