@@ -2204,19 +2204,6 @@ export default function App() {
                   <div style={styles.outroCardTitle}>Euer Teamfoto</div>
                   <TextLines text={page.photoText} style={styles.outroSmallText} />
 
-                  <div style={styles.socialButtonGrid}>
-                    <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style={styles.socialButton}>
-                      📸 Instagram öffnen
-                    </a>
-                    <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" style={styles.socialButton}>
-                      👍 Facebook öffnen
-                    </a>
-                  </div>
-
-                  <div style={styles.hashtagBox}>
-                    Hashtag zum Kopieren:<br />
-                    <strong>#geheimekeksformel</strong>
-                  </div>
                 </div>
 
                 <div style={styles.outroCard}>
