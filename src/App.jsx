@@ -2224,7 +2224,7 @@ export default function App() {
                   <TextLines text={page.reviewText} style={styles.outroSmallText} />
 
                   <a
-                    href="https://g.page/r/DEIN-GOOGLE-BEWERTUNGSLINK/review"
+                    href="https://g.page/r/CYxuAwRA_viKEBM/review"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={styles.reviewButton}
