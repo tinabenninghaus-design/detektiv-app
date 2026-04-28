@@ -2770,6 +2770,10 @@ const styles = {
     marginBottom: "14px",
     boxSizing: "border-box",
     background: "#fffdf9",
+    color: "#2c2015",
+backgroundColor: "#fffdf9",
+WebkitTextFillColor: "#2c2015",
+caretColor: "#2c2015",
   },
   primaryButton: {
     background: "linear-gradient(180deg, #5b902c 0%, #3f6f1d 100%)",
