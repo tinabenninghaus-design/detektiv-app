@@ -1552,16 +1552,36 @@ export default function App() {
 
                         {!effectiveSolved ? (
                           <>
-                          <label style={styles.uploadButton}>
-  📸 Teamfoto aufnehmen oder auswählen
-  <input
-    type="file"
-    accept="image/*"
-    capture
-    style={styles.hiddenFileInput}
-    onChange={handlePhotoChange}
-  />
-</label>
+                          <div style={{ display: "grid", gap: "10px", marginBottom: "14px" }}>
+  <label style={styles.uploadButton}>
+    📸 Teamfoto aufnehmen
+    <input
+      type="file"
+      accept="image/*"
+      capture="environment"
+      style={styles.hiddenFileInput}
+      onChange={handlePhotoChange}
+    />
+  </label>
+
+  <label
+    style={{
+      ...styles.uploadButton,
+      background: "#fff",
+      color: "#2e6410",
+      border: "3px solid #9bc56c",
+      boxShadow: "none",
+    }}
+  >
+    🖼️ Foto aus Galerie auswählen
+    <input
+      type="file"
+      accept="image/*"
+      style={styles.hiddenFileInput}
+      onChange={handlePhotoChange}
+    />
+  </label>
+</div>
 
                             {photoPreview ? (
                               <div style={styles.photoPreviewWrap}>
