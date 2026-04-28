@@ -578,7 +578,7 @@ solutionText: "Die richtige Lösung ist: Sonne",
     outroText:
       "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne das geheime Rezept!\n\nJetzt kann er nie wieder seine leckeren Kekse backen.\n\nDer Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
     photoText:
-      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.\n\nMarkiert uns oder nutzt den Hashtag:\n#geheimekeksformel\n\nSo sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
+  "📸 Wenn ihr möchtet, speichert euer Teamfoto als Erinnerung an euren Detektiv-Einsatz.\n\nDas Foto bleibt auf eurem Gerät und wird nicht automatisch an uns übertragen.",
     reviewText:
       "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
     returnText:
