@@ -1557,7 +1557,7 @@ export default function App() {
                           <input
   type="file"
   accept="image/*"
-  capture="user"
+  capture
   style={styles.hiddenFileInput}
   onChange={handlePhotoChange}
 />
