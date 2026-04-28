@@ -483,15 +483,16 @@ const pages = [
       "Seht euch hier genau um.\n\nWo könnte man sich verstecken,\nohne sofort gesehen zu werden?\n\nSchaut euch dort ganz genau um…\n\nFindet das Tier,\ndas alles beobachtet hat.",
     resultBox:
       "Sehr gut!\n\nIhr habt den stillen Beobachter gefunden.\n\nDer Elefant wackelt geheimnisvoll hin und her…\n\nDer Spion beugt sich zu ihm.\n\n„Was? Wirklich?“\n\nDann schaut er euch an:\n\n„Der Elefant hat alles gesehen…“\n\nEr denkt kurz nach.\n\n„Moment…“\n\n„Das war nicht nur ein Versteck…“\n\n„Das war ihr Treffpunkt…\nund sie haben ihn mit diesem Tier markiert…“\n\nEr nickt langsam.\n\n„Das ist wichtig…“",
-    hint1Title: "Wir kommen nicht weiter",
-    hint1Text:
-      "Schaut euch an, wo man sich gut verstecken könnte…",
-    hint1Image: null,
-    hint2Title: "Hinweis zum Treffpunkt",
-    hint2Text:
-      "Der Spion flüstert…\n\n„Nicht nur das Versteck ist wichtig…\nschaut euch auch darum herum um…“",
-    hint2Image: "/hinweis6-treffpunkt-1.jpeg",
-    hint2Image2: "/hinweis6-treffpunkt-2.jpeg",
+   hint1Title: "Hinweis 1",
+hint1Text:
+  "Schaut euch an, wo man sich gut verstecken könnte…",
+hint1Image: "/hinweis6-treffpunkt-1.jpeg",
+
+hint2Title: "Hinweis zum Treffpunkt",
+hint2ButtonText: "👀 Hinweis zum Treffpunkt anzeigen",
+hint2Text:
+  "Der Spion flüstert…\n\n„Nicht nur das Versteck ist wichtig…\nschaut euch auch darum herum um…“",
+hint2Image: "/hinweis6-treffpunkt-2.jpeg",
     solutionText: "Die richtige Lösung ist: Elefant",
     answerKey: "tier",
     correctAnswers: ["elefant", "Elefant"],
@@ -1675,31 +1676,30 @@ export default function App() {
                           </button>
                         ) : null}
 
-                        {hintLevel >= 1 && !effectiveSolved ? (
-                          <HintCard
-                            title={page.hint1Title}
-                            text={page.hint1Text}
-                            image={page.hint1Image}
-                          />
-                        ) : null}
+                   {hintLevel === 1 && !effectiveSolved ? (
+  <HintCard
+    title={page.hint1Title}
+    text={page.hint1Text}
+    image={page.hint1Image}
+  />
+) : null}
 
-                        {hintLevel === 1 && !effectiveSolved ? (
-                          <button
-                            style={styles.secondaryButton}
-                            onClick={() => setHintLevel(2)}
-                          >
-                            👀 Noch ein Tipp zum Fluchtplan
-                          </button>
-                        ) : null}
+            {hintLevel === 1 && !effectiveSolved ? (
+  <button
+    style={styles.secondaryButton}
+    onClick={() => setHintLevel(2)}
+  >
+    {page.hint2ButtonText || "👀 Noch ein Tipp anzeigen"}
+  </button>
+) : null}
 
-                        {hintLevel >= 2 && !effectiveSolved ? (
-                          <HintCard
-                            title={page.hint2Title}
-                            text={page.hint2Text}
-                            image={page.hint2Image}
-                            image2={page.hint2Image2}
-                          />
-                        ) : null}
+                        {hintLevel === 2 && !effectiveSolved ? (
+  <HintCard
+    title={page.hint2Title}
+    text={page.hint2Text}
+    image={page.hint2Image}
+  />
+) : null}
 
                         {hintLevel >= 2 && !effectiveSolved ? (
                           <button style={styles.secondaryButton} onClick={revealSolution}>
