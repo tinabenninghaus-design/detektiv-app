@@ -577,9 +577,8 @@ solutionText: "Die richtige Lösung ist: Sonne",
     titleLine2: "",
     outroText:
       "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne das geheime Rezept!\n\nJetzt kann er nie wieder seine leckeren Kekse backen.\n\nDer Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
-    
-      photoText:
-  "📸 Wenn ihr möchtet, speichert euer Teamfoto als Erinnerung an euren Detektiv-Einsatz.\n\nDas Foto bleibt auf eurem Gerät und wird nicht automatisch an uns übertragen.",
+    photoText:
+      "📸 Wenn ihr möchtet, teilt euer Teamfoto gerne auf Instagram oder Facebook.\n\nMarkiert uns oder nutzt den Hashtag:\n#geheimekeksformel\n\nSo sehen wir, welche starken Detektiv-Teams Meister der Krümel auf den Fersen waren.",
     reviewText:
       "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
     returnText:
@@ -2205,7 +2204,22 @@ export default function App() {
                   <div style={styles.outroCardTitle}>Euer Teamfoto</div>
                   <TextLines text={page.photoText} style={styles.outroSmallText} />
 
-                                <div style={styles.outroCard}>
+                  <div style={styles.socialButtonGrid}>
+                    <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style={styles.socialButton}>
+                      📸 Instagram öffnen
+                    </a>
+                    <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" style={styles.socialButton}>
+                      👍 Facebook öffnen
+                    </a>
+                  </div>
+
+                  <div style={styles.hashtagBox}>
+                    Hashtag zum Kopieren:<br />
+                    <strong>#geheimekeksformel</strong>
+                  </div>
+                </div>
+
+                <div style={styles.outroCard}>
                   <div style={styles.outroCardTitle}>Hat euch die Mission gefallen?</div>
                   <TextLines text={page.reviewText} style={styles.outroSmallText} />
 
