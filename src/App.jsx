@@ -577,7 +577,7 @@ solutionText: "Die richtige Lösung ist: Sonne",
     titleLine2: "",
     outroText:
       "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne das geheime Rezept!\n\nJetzt kann er nie wieder seine leckeren Kekse backen.\n\nDer Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
-    photoText:
+    
       photoText:
   "📸 Wenn ihr möchtet, speichert euer Teamfoto als Erinnerung an euren Detektiv-Einsatz.\n\nDas Foto bleibt auf eurem Gerät und wird nicht automatisch an uns übertragen.",
     reviewText:
