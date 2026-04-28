@@ -520,18 +520,29 @@ hint2Image: "/hinweis6-treffpunkt-2.jpeg",
     taskTitle: "DAS NOTFALLZEICHEN",
     taskText:
       "Seht euch hier ganz genau um.\n\nFindet heraus,\nob der Meister hier ein Zeichen hinterlassen hat.\n\nWenn ja…\nwelches ist es?",
-    choiceOptions: [
-      {
-        value: "sonne",
-        label: "☀️ Sonne",
-        resultBox:
-          "Ja!\n\nIhr habt das geheime Zeichen gefunden.\n\nDer Spion nickt euch zu.\n\n„Das ist es…“\n\nEr schaut sich noch einmal um.\n\n„Ab hier wird es zu gefährlich für mich…“\n\n„Ich muss zurück auf meinen Posten,\nbevor der Meister merkt, dass ich verschwunden bin…“\n\nEr tritt einen Schritt zurück.\n\n„Ihr seid jetzt auf euch allein gestellt.“\n\nDann flüstert er:\n\n„Der Meister weiß, dass ihr ihm dicht auf den Fersen seid…“\n\n„Er hat keine Zeit mehr…\ner ist panisch aus dem Ort geflohen…“\n\n„Los! Hinterher!“\n\nUnd plötzlich ist er verschwunden.",
-      },
-      { value: "stern", label: "⭐ Stern" },
-      { value: "herz", label: "❤️ Herz" },
-      { value: "blume", label: "🌼 Blume" },
-    ],
-    answerKey: "symbol",
+choiceOptions: [
+  { value: "stern", label: "⭐ Stern" },
+  { value: "herz", label: "❤️ Herz" },
+  { value: "blume", label: "🌼 Blume" },
+  {
+    value: "sonne",
+    label: "☀️ Sonne",
+    resultBox:
+      "Ja!\n\nIhr habt das geheime Zeichen gefunden.\n\nDer Spion nickt euch zu.\n\n„Das ist es…“\n\nEr schaut sich noch einmal um.\n\n„Ab hier wird es zu gefährlich für mich…“\n\n„Ich muss zurück auf meinen Posten,\nbevor der Meister merkt, dass ich verschwunden bin…“\n\nEr tritt einen Schritt zurück.\n\n„Ihr seid jetzt auf euch allein gestellt.“\n\nDann flüstert er:\n\n„Der Meister weiß, dass ihr ihm dicht auf den Fersen seid…“\n\n„Er hat keine Zeit mehr…\ner ist panisch aus dem Ort geflohen…“\n\n„Los! Hinterher!“\n\nUnd plötzlich ist er verschwunden.",
+  },
+],
+answerKey: "symbol",
+hint1Title: "Hinweis 1",
+hint1Text:
+  "Schaut euch diese Seite mal etwas genauer an.",
+hint1Image: "/hinweis7-notfallzeichen-1.jpeg",
+hint2Title: "Hinweis 2",
+hint2ButtonText: "👀 Noch ein Hinweis zum Notfallzeichen",
+hint2Text:
+  "Ob der Meister wohl hier sein Notfallzeichen hinterlassen hat?",
+hint2Image: "/hinweis7-notfallzeichen-2.jpeg",
+solutionValue: "sonne",
+solutionText: "Die richtige Lösung ist: Sonne",
     nextMapHint: {
       lat: 48.288146724406005,
       lng: 7.747724653451934,
@@ -1418,24 +1429,98 @@ export default function App() {
                       !effectiveSolved ? (
                         page.id === "station4" ? (
                           <>
-                            <div style={styles.choiceButtonGroup}>
-                              {page.choiceOptions?.map((option) => (
-                                <button
-                                  key={option.value}
-                                  style={{
-                                    ...styles.choiceButton,
-                                    ...(wrongChoice === option.value ? styles.choiceButtonWrong : {}),
-                                  }}
-                                  onClick={() => handleChoiceSelect(option.value)}
-                                >
-                                  {option.label}
-                                </button>
-                              ))}
-                            </div>
+                            <>
+  <div style={styles.choiceButtonGroup}>
+    {page.choiceOptions?.map((option) => (
+      <button
+        key={option.value}
+        style={{
+          ...styles.choiceButton,
+          ...(wrongChoice === option.value ? styles.choiceButtonWrong : {}),
+        }}
+        onClick={() => handleChoiceSelect(option.value)}
+      >
+        {option.label}
+      </button>
+    ))}
+  </div>
 
-                            {choiceError ? (
-                              <div style={styles.inlineErrorBox}>{choiceError}</div>
-                            ) : null}
+  {choiceError ? (
+    <div style={styles.inlineErrorBox}>{choiceError}</div>
+  ) : null}
+
+  {page.id === "station7" && !effectiveSolved ? (
+    <div style={styles.optionalHelpWrap}>
+      {hintLevel === 0 ? (
+        <>
+          <div style={styles.subtleHintIntro}>
+            Nur anklicken, wenn ihr wirklich nicht weiterkommt:
+          </div>
+          <button
+            style={styles.secondaryButton}
+            onClick={() => setHintLevel(1)}
+          >
+            👀 Hinweis anzeigen
+          </button>
+        </>
+      ) : null}
+
+      {hintLevel === 1 ? (
+        <HintCard
+          title={page.hint1Title}
+          text={page.hint1Text}
+          image={page.hint1Image}
+          onImageClick={
+            page.hint1Image
+              ? () => openZoom(page.hint1Image, page.hint1Title)
+              : null
+          }
+        />
+      ) : null}
+
+      {hintLevel === 1 ? (
+        <button
+          style={styles.secondaryButton}
+          onClick={() => setHintLevel(2)}
+        >
+          {page.hint2ButtonText || "👀 Noch ein Hinweis"}
+        </button>
+      ) : null}
+
+      {hintLevel === 2 ? (
+        <HintCard
+          title={page.hint2Title}
+          text={page.hint2Text}
+          image={page.hint2Image}
+          onImageClick={
+            page.hint2Image
+              ? () => openZoom(page.hint2Image, page.hint2Title)
+              : null
+          }
+        />
+      ) : null}
+
+      {hintLevel === 2 ? (
+        <button
+          style={styles.secondaryButton}
+          onClick={() => {
+            setAnswers((prev) => ({
+              ...prev,
+              [page.answerKey]: page.solutionValue || "sonne",
+            }));
+            setChoiceError("");
+            setWrongChoice("");
+            setHintLevel(0);
+            setShowSolution(true);
+            setSolved(true);
+          }}
+        >
+          🔐 Lösung anzeigen
+        </button>
+      ) : null}
+    </div>
+  ) : null}
+</>
 
                             <div style={styles.optionalHelpWrap}>
                               {hintLevel === 0 ? (
