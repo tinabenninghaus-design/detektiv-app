@@ -1026,23 +1026,30 @@ export default function App() {
   const getItemBelow = (list, index) => list[index === list.length - 1 ? 0 : index + 1];
 
   const tryOpenLock = () => {
-    const isCorrect =
-      lockLeft === correctLeft &&
-      currentAnimal.label === correctAnimalLabel &&
-      currentSymbol.label === correctSymbolLabel;
+  const selectedNumber = Number(lockLeft);
+  const selectedAnimal = normalize(currentAnimal?.label);
+  const selectedSymbol = normalize(currentSymbol?.label);
 
-    if (isCorrect) {
-      vibrate([80, 40, 120]);
-      setTimeout(() => { playSound("/unlock.mp3", 0.7); }, 120);
-      setShowLockHint1(false);
-      setShowLockHint2(false);
-      setShowLockSolution(false);
-      setLockOpened(true);
-      return;
-    }
+  const isCorrect =
+    selectedNumber === 3 &&
+    selectedAnimal === normalize("Elefant") &&
+    selectedSymbol === normalize("Sonne");
 
-    setLockAttempts((prev) => prev + 1);
-  };
+  if (isCorrect) {
+    vibrate([80, 40, 120]);
+    setTimeout(() => {
+      playSound("/unlock.mp3", 0.7);
+    }, 120);
+
+    setShowLockHint1(false);
+    setShowLockHint2(false);
+    setShowLockSolution(false);
+    setLockOpened(true);
+    return;
+  }
+
+  setLockAttempts((prev) => prev + 1);
+};
 
   const unlockMission = async () => {
     if (isRedeemingCode) return;
@@ -1797,7 +1804,77 @@ export default function App() {
                     ) : null}
                   </div>
                 ) : null}
+{page.id === "station7" && !effectiveSolved ? (
+  <div style={styles.optionalHelpWrap}>
+    {hintLevel === 0 ? (
+      <>
+        <div style={styles.subtleHintIntro}>
+          Nur anklicken, wenn ihr wirklich nicht weiterkommt:
+        </div>
+        <button
+          style={styles.secondaryButton}
+          onClick={() => setHintLevel(1)}
+        >
+          👀 Hinweis anzeigen
+        </button>
+      </>
+    ) : null}
 
+    {hintLevel === 1 ? (
+      <HintCard
+        title={page.hint1Title}
+        text={page.hint1Text}
+        image={page.hint1Image}
+        onImageClick={
+          page.hint1Image
+            ? () => openZoom(page.hint1Image, page.hint1Title)
+            : null
+        }
+      />
+    ) : null}
+
+    {hintLevel === 1 ? (
+      <button
+        style={styles.secondaryButton}
+        onClick={() => setHintLevel(2)}
+      >
+        {page.hint2ButtonText || "👀 Noch ein Hinweis"}
+      </button>
+    ) : null}
+
+    {hintLevel === 2 ? (
+      <HintCard
+        title={page.hint2Title}
+        text={page.hint2Text}
+        image={page.hint2Image}
+        onImageClick={
+          page.hint2Image
+            ? () => openZoom(page.hint2Image, page.hint2Title)
+            : null
+        }
+      />
+    ) : null}
+
+    {hintLevel === 2 ? (
+      <button
+        style={styles.secondaryButton}
+        onClick={() => {
+          setAnswers((prev) => ({
+            ...prev,
+            [page.answerKey]: page.solutionValue || "sonne",
+          }));
+          setChoiceError("");
+          setWrongChoice("");
+          setHintLevel(0);
+          setShowSolution(true);
+          setSolved(true);
+        }}
+      >
+        🔐 Lösung anzeigen
+      </button>
+    ) : null}
+  </div>
+) : null}
                 {effectiveSolved && currentResultBox ? (
                   <TextLines text={currentResultBox} style={styles.resultBox} />
                 ) : null}
