@@ -85,20 +85,12 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
     }
   };
 
-  const handleAssemble = () => {
-    if (snapping || assembled) return;
+ const handleAssemble = () => {
+  if (assembled) return;
 
-    setSnapping(true);
-
-    setTimeout(() => {
-      playSnapSound();
-    }, 450);
-
-    setTimeout(() => {
-      onAssemble();
-      setSnapping(false);
-    }, 1250);
-  };
+  playSnapSound();
+  onAssemble();
+};
 
   return (
     <div style={styles.planAssemblyCard}>
