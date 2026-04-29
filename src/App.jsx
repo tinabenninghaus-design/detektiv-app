@@ -1,16 +1,21 @@
 import { useMemo, useState, useEffect } from "react";
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Circle } from "react-leaflet";
-import { keksformelKappelMission } from "./missions/keksformel-kappel";
-
-const missions = {
-  "keksformel-kappel": keksformelKappelMission,
-};
+import { defaultMission, missions } from "./missions";
+import {
+  DEFAULT_LANGUAGE,
+  SUPPORTED_LANGUAGES,
+  LANGUAGE_CONFIG,
+  LANGUAGE_ASSET_PREFIXES,
+  normalizeLanguage,
+  languageAsset,
+  localizePageMedia,
+} from "./i18n/languages";
 
 function getMissionFromUrl() {
   const path = window.location.pathname;
   const slug = path.split("/m/")[1]?.split("/")[0];
-  return missions[slug] || keksformelKappelMission;
+  return missions[slug] || defaultMission;
 }
 
 const mission = getMissionFromUrl();
@@ -19,7 +24,72 @@ const DEMO_ACCESS_CODE = mission.demoAccessCode;
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const START_MAPS_URL = mission.startMapsUrl;
 
-function MapHint({ lat, lng, radius, title }) {
+function getImageFallbacks(src) {
+  if (!src || typeof src !== "string") return [];
+
+  let path = src;
+  try {
+    path = new URL(src, window.location.origin).pathname;
+  } catch {
+    // keep original path
+  }
+
+  const candidates = [];
+  const add = (value) => {
+    if (value && value !== path && !candidates.includes(value)) candidates.push(value);
+  };
+
+  const swapJpgJpeg = (value) => {
+    if (value.endsWith(".jpeg")) return value.replace(/\.jpeg$/i, ".jpg");
+    if (value.endsWith(".jpg")) return value.replace(/\.jpg$/i, ".jpeg");
+    return null;
+  };
+
+  const swapped = swapJpgJpeg(path);
+  if (swapped) add(swapped);
+
+  const missionLangMatch = path.match(/^\/missions\/[^/]+\/(de|fr|eng|en)\/(.+)$/);
+  if (missionLangMatch) {
+    const legacyLanguagePath = `/${missionLangMatch[1]}/${missionLangMatch[2]}`;
+    add(legacyLanguagePath);
+    const legacySwapped = swapJpgJpeg(legacyLanguagePath);
+    if (legacySwapped) add(legacySwapped);
+
+    const rootPath = `/${missionLangMatch[2]}`;
+    add(rootPath);
+    const rootSwapped = swapJpgJpeg(rootPath);
+    if (rootSwapped) add(rootSwapped);
+  }
+
+  const langMatch = path.match(/^\/(de|fr|eng|en)\/(.+)$/);
+  if (langMatch) {
+    const rootPath = `/${langMatch[2]}`;
+    add(rootPath);
+    const rootSwapped = swapJpgJpeg(rootPath);
+    if (rootSwapped) add(rootSwapped);
+  }
+
+  return candidates;
+}
+
+function handleImageFallback(event) {
+  const img = event.currentTarget;
+  const originalSrc = img.dataset.originalSrc || img.getAttribute("src") || "";
+  img.dataset.originalSrc = originalSrc;
+
+  const fallbacks = getImageFallbacks(originalSrc);
+  const index = Number(img.dataset.fallbackIndex || "0");
+
+  if (fallbacks[index]) {
+    img.dataset.fallbackIndex = String(index + 1);
+    img.src = fallbacks[index];
+    return;
+  }
+
+  img.style.display = "none";
+}
+
+function MapHint({ lat, lng, radius, title, caption }) {
   return (
     <div style={styles.mapCard}>
       {title ? <div style={styles.mapTitle}>{title}</div> : null}
@@ -38,7 +108,7 @@ function MapHint({ lat, lng, radius, title }) {
         <Circle center={[lat, lng]} radius={radius} />
       </MapContainer>
       <div style={styles.mapCaption}>
-        Der markierte Bereich zeigt euch ungefähr, wo ihr suchen müsst.
+        {caption || "Der markierte Bereich zeigt euch ungefähr, wo ihr suchen müsst."}
       </div>
     </div>
   );
@@ -72,7 +142,7 @@ function ZoomModal({ image, title, onClose }) {
   );
 }
 
-function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZoom }) {
+function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZoom, ui }) {
   const [snapping, setSnapping] = useState(false);
 
   const playSnapSound = () => {
@@ -94,41 +164,37 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
 
   return (
     <div style={styles.planAssemblyCard}>
-      <div style={styles.planAssemblyTitle}>🧩 Der zweite Teil des Fluchtplans</div>
+      <div style={styles.planAssemblyTitle}>{ui.planAssemblyTitle}</div>
 
       {!assembled ? (
         <>
-          <div style={styles.planAssemblyText}>
-            Der Spion hält euch den zweiten Teil hin.
-            <br />
-            Wenn beide Stücke zusammenpassen, wisst ihr, wohin Meister der Krümel geflüchtet ist.
-          </div>
+          <TextLines text={ui.planAssemblyText} style={styles.planAssemblyText} />
 
           <div style={styles.planPartsPreview}>
             <img
               src={part1}
-              alt="Erster Teil des Fluchtplans"
+              alt={ui.planPart1Title}
               style={{
                 ...styles.planPartImage,
                 ...(snapping ? styles.planPartImageSnapping : {}),
               }}
-              onClick={() => onZoom(part1, "Fluchtplan Teil 1")}
+              onClick={() => onZoom(part1, ui.planPart1Title)}
             />
             <img
               src={part2}
-              alt="Zweiter Teil des Fluchtplans"
+              alt={ui.planPart2Title}
               style={{
                 ...styles.planPartImageFlying,
                 ...(snapping ? styles.planPartImageFlyingSnapping : {}),
               }}
-              onClick={() => onZoom(part2, "Fluchtplan Teil 2")}
+              onClick={() => onZoom(part2, ui.planPart2Title)}
             />
 
             {snapping ? (
               <div style={styles.snapText}>
-                KLICK!
+                {ui.planAssemblySnapTitle}
                 <br />
-                Die beiden Teile passen perfekt zusammen...
+                {ui.planAssemblySnapText}
               </div>
             ) : null}
           </div>
@@ -141,30 +207,24 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
             onClick={handleAssemble}
             disabled={snapping}
           >
-            {snapping ? "🧩 Wartet mal... jetzt ergibt alles Sinn!" : "🧩 Fluchtplan zusammensetzen"}
+            {snapping ? ui.planAssemblyWorking : ui.planAssemblyButton}
           </button>
         </>
       ) : (
         <>
-          <div style={styles.planAssemblyText}>
-            Wow!
-            <br /><br />
-            Jetzt ergibt alles Sinn!
-            <br /><br />
-            Ihr habt den kompletten Fluchtplan!
-          </div>
+          <TextLines text={ui.planAssemblyDoneText} style={styles.planAssemblyText} />
 
           <div style={styles.completePlanWrap}>
             <img
               src={completeImage}
-              alt="Vollständiger Fluchtplan"
+              alt={ui.planCompleteTitle}
               style={styles.completePlanImage}
-              onClick={() => onZoom(completeImage, "Vollständiger Fluchtplan")}
+              onClick={() => onZoom(completeImage, ui.planCompleteTitle)}
               onError={(e) => {
-                e.currentTarget.style.display = "none";
+                handleImageFallback(e);
               }}
             />
-            <div style={styles.zoomHint}>Zum Vergrößern antippen</div>
+            <div style={styles.zoomHint}>{ui.zoomHint}</div>
           </div>
         </>
       )}
@@ -172,7 +232,7 @@ function PlanAssembly({ part1, part2, completeImage, assembled, onAssemble, onZo
   );
 }
 
-function HintCard({ title, text, image, image2, onImageClick }) {
+function HintCard({ title, text, image, image2, onImageClick, zoomHintText = "Zum Vergrößern antippen" }) {
   return (
     <div style={styles.hintCard}>
       <div style={styles.hintCardTitle}>{title}</div>
@@ -184,10 +244,10 @@ function HintCard({ title, text, image, image2, onImageClick }) {
             style={{ ...styles.hintImage, cursor: onImageClick ? "zoom-in" : "default" }}
             onClick={onImageClick}
             onError={(e) => {
-              e.currentTarget.style.display = "none";
+              handleImageFallback(e);
             }}
           />
-          {onImageClick ? <div style={styles.zoomHint}>Zum Vergrößern antippen</div> : null}
+          {onImageClick ? <div style={styles.zoomHint}>{zoomHintText}</div> : null}
         </div>
       ) : null}
       {image2 ? (
@@ -197,7 +257,7 @@ function HintCard({ title, text, image, image2, onImageClick }) {
             alt={title ? `${title} 2` : "Zusätzlicher Hinweis"}
             style={styles.hintImage}
             onError={(e) => {
-              e.currentTarget.style.display = "none";
+              handleImageFallback(e);
             }}
           />
         </div>
@@ -219,408 +279,21 @@ function LockWheel({ topValue, value, bottomValue, onUp, onDown }) {
   );
 }
 
-const pages = [
-  {
-    id: "access",
-    type: "access",
-    title: "MISSION",
-    titleLine2: "DIE VERSCHWUNDENE",
-    titleLine3: "KEKSFORMEL",
-    subtitle: "EIN ABENTEUER FÜR KLEINE DETEKTIVE",
-    mapHint: {
-      lat: 48.290403410202586,
-      lng: 7.747882244995799,
-      radius: 60,
-      title: "STARTPUNKT",
-    },
-  },
-  {
-    id: "rules",
-    type: "rules",
-    title: "REGELN",
-    titleLine2: "BEVOR DIE MISSION STARTET",
-    intro:
-      "Bevor ihr Meister der Krümel verfolgt, lest bitte kurz die wichtigsten Regeln.\n\nDann kann das Abenteuer sicher losgehen.",
-    rules: [
-      {
-        icon: "🚦",
-        title: "Ihr spielt auf eigene Verantwortung",
-        text: "Achtet auf Verkehr, Wege und eure Umgebung. Erwachsene behalten die Gruppe im Blick.",
-      },
-      {
-        icon: "🚫",
-        title: "Kein Privatgelände betreten",
-        text: "Alle Hinweise sind von öffentlich zugänglichen Wegen aus erreichbar.",
-      },
-      {
-        icon: "🤫",
-        title: "Nehmt Rücksicht",
-        text: "Bitte stört keine Anwohner, Passanten oder andere Kinder.",
-      },
-      {
-        icon: "🧹",
-        title: "Hinterlasst alles ordentlich",
-        text: "Nehmt nichts mit, außer es ist ausdrücklich Teil des Spiels.",
-      },
-      {
-        icon: "🗑️",
-        title: "Kein Müll, kein Lärm",
-        text: "Meister der Krümel mag Chaos – ihr bleibt besser unauffällig.",
-      },
-    ],
-    acceptText: "✅ Wir haben die Regeln gelesen und akzeptiert",
-  },
-  {
-    id: "start",
-    type: "start",
-    title: "MISSION",
-    titleLine2: "DIE VERSCHWUNDENE",
-    titleLine3: "KEKSFORMEL",
-    subtitle: "EIN ABENTEUER FÜR KLEINE DETEKTIVE",
-    storyBox:
-      "Detektive aufgepasst!\n\nDer Club der Keksliebhaber zählt auf euch.\n\nDie geheime Keksformel wurde gestohlen!\n\nUnd zwar von niemand Geringerem als:\nMEISTER DER KRÜMEL!\n\nIhr seid genau an dem Ort angekommen,\nan dem er zuletzt gesehen wurde...\n\nUnd ich fürchte...\n\ner weiß längst, dass ihr hier seid.\n\nDenn er hat euch eine Nachricht hinterlassen.\n\nHört sie euch jetzt an...\n\nVielleicht ist das seine erste Spur.",
-    audio: "/meister-intro.mp3",
-    audioTitle: "Geheime Nachricht anhören",
-  },
-  {
-    id: "station1",
-    type: "riddle",
-    title: "STATION 1:",
-    titleLine2: "DIE ERSTE SPUR",
-    image: "/station1.jpeg",
-    storyBox:
-      "Wartet mal...\n\nSeht ihr das?\n\nKleine Kekskrümel liegen auf dem Boden!\n\nSie führen direkt zum Eingang der Kirche...\n\nMeister der Krümel war also hier.\n\nDas ist seine erste Spur!",
-    taskTitle: "DIE GEHEIMEN HELFER",
-    taskText:
-      "Meister der Krümel war hier…\n\nDoch dann wurde er plötzlich von einem Steinmonster erschreckt!\n\nZum Glück hat das Steinmonster kleine Helfer.\n\nSie haben genau beobachtet,\nwohin der Meister danach geflüchtet ist.\n\nFindet die kleinen Helfer\nund zählt sie!",
-    resultBox:
-      "Sehr gut, Detektive!\n\nDie kleinen Helfer nicken euch zu.\n\nEiner von ihnen flüstert:\n\n„Diese Zahl könnte später noch wichtig werden…“\n\nDann zeigt euch ein anderer Helfer einen geheimen Zettel…",
-    hint1Title: "Hinweis 1",
-    hint1Text:
-      "Tipp:\n\nDas Monster sitzt weiter unten an der Figur…\n\nGanz in seiner Nähe\nverstecken sich die Helfer.",
-    hint1Image: "/hinweis1a.jpeg",
-    hint2Title: "Hinweis 2",
-    hint2Text:
-      "Jetzt wird’s einfach:\n\nDie Helfer haben Flügel\nund kleine Gesichter.\n\nZählt alle, die ihr sehen könnt!",
-    hint2Image: "/hinweis1b.jpeg",
-    solutionText: "Die richtige Lösung ist: 3",
-    answerKey: "helfer",
-    correctAnswers: ["3"],
-    placeholder: "Zahl eingeben",
-    nextMapHint: {
-      lat: 48.28995189877323,
-      lng: 7.747286794557996,
-      radius: 120,
-      title: "ORIENTIERUNGSHILFE SCHULHOF",
-    },
-    nextHintImage: "/hinweis1.jpeg",
-    nextHintZoomable: true,
-    nextHintText:
-      "Hier wurde Meister der Krümel als Nächstes gesehen. Erkennt ihr den Ort?",
-  },
-  {
-    id: "station2",
-    type: "riddle",
-    taskMode: "choice",
-    title: "STATION 2:",
-    titleLine2: "DIE KRAFTPROBE",
-    image: "/station2.jpeg",
-    storyBox:
-      "Hier ist er stehen geblieben...\n\nAber nicht, um sich auszuruhen.\n\nNein – hier wollte Meister der Krümel zeigen,\nwie toll er ist.\n\n„Selbst wenn ihr meine Keksformel findet…“, hat er geprahlt,\n\n„ihr habt gar nicht die Kraft,\num den perfekten Teig zu machen!“\n\nDann hat er sich an die Stange gehängt\nund laut mitgezählt:\n\n„1… 2… 3…“\n\nBis er bei 10 angekommen ist.\n\nEr wollte euch wohl beweisen,\ndass ihr keine Chance gegen ihn habt...\n\nAber vielleicht hat er euch unterschätzt...",
-    taskTitle: "DER STÄRKE-CHECK",
-    taskText:
-      "Jetzt seid ihr dran!\n\nHängt euch an die Stange\nund zählt eure Sekunden.\n\nSchafft ihr mehr als die 10 Sekunden von Meister der Krümel?\n\nOder seid ihr vielleicht sogar stärker als er?",
-    choiceOptions: [
-      {
-        value: "ueberboten",
-        label: "💪 Überboten!",
-        resultBox:
-          "Wow!\n\nIhr wart stärker als Meister der Krümel!\n\nDas hat er bestimmt nicht erwartet...\n\nJetzt wird er langsam nervös!",
-      },
-      {
-        value: "punktlandung",
-        label: "🎯 Punktlandung!",
-        resultBox:
-          "Perfekt!\n\nGenau so stark wie Meister der Krümel.\n\nAber ihr habt etwas, das er nicht hat:\n\nTeamgeist!\n\nUnd das bringt euch weiter.",
-      },
-      {
-        value: "knapp",
-        label: "😅 Knapp dran!",
-        resultBox:
-          "Das war richtig stark!\n\nIhr wart ganz nah dran an Meister der Krümel.\n\nUnd wer so nah dran ist,\nkommt beim nächsten Versuch ganz sicher vorbei!\n\nEr sollte euch besser nicht unterschätzen…",
-      },
-    ],
-    answerKey: "kraftprobe",
-    nextMapHint: {
-      lat: 48.29009868466259,
-      lng: 7.746701051557932,
-      radius: 50,
-      title: "ORIENTIERUNGSHILFE ZUM HECKENDURCHGANG",
-    },
-    nextHintImage: "/hinweis2.jpeg",
-    nextHintText:
-      "Meister der Krümel ist weiter geflüchtet...\n\nHaltet Ausschau nach einem schmalen Durchgang zwischen den Hecken – er versteckt sich etwas am Rand des Geländes.\n\nDort geht die Spur vom Meister weiter!",
-  },
-  {
-    id: "station3",
-    type: "riddle",
-    taskMode: "choice",
-    title: "STATION 3:",
-    titleLine2: "DER GEHEIMGANG",
-    image: "/station3.jpeg",
-    storyBox: "Was war das denn???\n\nHört genau hin!",
-    audio: "/station3.mp3",
-    audioTitle: "🎧 Geräusch aus dem Gebüsch anhören",
-    taskTitle: "DIE SCHLEICHMISSION",
-    taskText:
-      "Auf geht’s, Detektive!\n\nDas ist eure Chance!\n\nSchleicht euch jetzt so leise wie möglich durch den Gang,\num Meister der Krümel zu erwischen!",
-    choiceOptions: [
-      {
-        value: "lautlos",
-        label: "🕵️ Lautlos wie Schatten",
-        resultBox:
-          "Perfekt!\n\nIhr wart fast nicht zu hören.\n\nDoch Meister der Krümel war euch trotzdem noch einen Schritt voraus...\n\nAber ihr seid ganz dicht hinter ihm!",
-      },
-      {
-        value: "vorsichtig",
-        label: "🤫 Ziemlich leise",
-        resultBox:
-          "Das war schon richtig gut!\n\nEin kleines Geräusch war vielleicht dabei...\n\nDoch Meister der Krümel war euch trotzdem noch einen Schritt voraus.\n\nZum Glück seid ihr weiter auf seiner Spur!",
-      },
-      {
-        value: "laut",
-        label: "😂 Eher laut unterwegs",
-        resultBox:
-          "Oh oh...\n\nDas war ganz schön laut!\n\nVielleicht hat Meister der Krümel euch gehört...\n\nUnd trotzdem war er euch wieder einen Schritt voraus.\n\nAber ihr gebt nicht auf und bleibt dran!",
-      },
-    ],
-    answerKey: "schleichmission",
-    nextHintImage: "/hinweis3.jpeg",
-    nextHintText:
-      "Die Spur führt weiter. Schaut genau hin – dort hat sich Meister der Krümel etwas Neues ausgedacht.",
-  },
-  {
-    id: "station4",
-    type: "riddle",
-    taskMode: "choice",
-    title: "STATION 4:",
-    titleLine2: "DER FLUCHTPLAN",
-    image: null,
-    storyBox:
-      "Moment mal...\n\nWas liegt denn da auf dem Boden?\n\nDas sieht aus wie ein Fluchtplan!\n\nMeister der Krümel muss ihn unterwegs verloren haben.\n\nHebt ihn vorsichtig auf und schaut ihn euch genau an...",
-    planImage: "/station4.jpeg",
-    planButtonText: "🧾 Fluchtplan aufheben",
-    taskTitle: "DER GEHEIME FLUCHTPLAN",
-    taskText:
-      "Oh nein...\n\nDa fehlt ja ein Stück!\n\nDer Plan ist unvollständig.\n\nAber vielleicht reicht das schon, um Meister der Krümel ein Stück zu folgen.\n\nFolgt den Kreisen – genau so, wie sie eingezeichnet sind.\n\nGeht den Weg nach, bis der Plan plötzlich endet.\n\nUnd genau dort stimmt etwas nicht...\n\nSchaut euch ganz genau um!",
-    choiceOptions: [
-      {
-        value: "fluchtplan",
-        label: "👀 Wir haben etwas entdeckt!",
-      },
-    ],
-    answerKey: "untergrund",
-    hint1Title: "Hinweis 1",
-    hint1Text:
-      "Ihr wisst nicht,\nwohin ihr gehen müsst?\n\nVergleicht den ersten Teil des Fluchtplans mit der Straße vor euch.\n\nDie Kreise auf dem Plan sind eure Spur.",
-    hint1Image: null,
-    hint2Title: "Hinweis 2",
-    hint2Text:
-      "Folgt nur den Gullideckeln,\ndie wie die Kreise auf dem ersten Fluchtplan-Teil angeordnet sind.\n\nWenn der Plan endet, seid ihr am richtigen Ort.\n\nSchaut euch dort ganz genau um...",
-    hint2Image: null,
-    mapHint: {
-      lat: 48.29020174749672,
-      lng: 7.742450771764303,
-      radius: 20,
-      title: "ORIENTIERUNGSHILFE ZUM ENDE DER SPUR",
-    },
-  },
-  {
-    id: "station5",
-    type: "riddle",
-    taskMode: "photoChoice",
-    title: "STATION 5:",
-    titleLine2: "DER SPION",
-    image: "/station5.jpeg",
-    storyBox:
-      "Stopp!\n\nHabt ihr das gesehen?\n\nDa beobachtet euch jemand...\n\nEr hat euch die ganze Zeit im Blick behalten.\n\nDas muss ein Spion von Meister der Krümel sein!\n\nEr tritt vorsichtig näher...\n\nUnd flüstert:\n\n„Psst... ich will euch helfen.“",
-    taskTitle: "DER SEITENWECHSEL",
-    taskText:
-      "Der Spion schaut sich nervös um...\n\n„Meister der Krümel hat mir einen Auftrag gegeben.\nIch sollte diesen Teil des Fluchtplans für ihn aufbewahren...“\n\nEr hält kurz inne.\n\n„Aber ich habe genug davon.\nIch bekomme nicht mal einen einzigen Keks!“\n\nEr schaut euch entschlossen an:\n\n„Ich beweise euch, dass ich wirklich die Seiten wechseln will.“\n\nLasst uns ein verrücktes Teamfoto machen!\n\nDann wisst ihr, dass ich jetzt zu euch gehöre.",
-    choiceOptions: [
-      {
-        value: "foto gemacht",
-        label: "📸 Wir haben ein Teamfoto gemacht!",
-        resultBox:
-          "Perfekt!\n\nDer Spion grinst breit.\n\n„Jetzt sind wir ein Team.“\n\nEr schaut sich noch einmal vorsichtig um...\n\n„Wenn Meister der Krümel merkt, dass ich euch helfe, bekomme ich richtig Ärger.“\n\nDann beugt er sich zu euch und flüstert:\n\n„Aber egal. Zusammen schaffen wir das!“\n\nEr holt ein zerknittertes Stück Papier hervor.\n\n„Das hier hat mir Meister der Krümel zur Aufbewahrung gegeben...\nDer zweite Teil vom Fluchtplan!“\n\nEr zwinkert euch zu.\n\n„Jetzt gehört er euch.“",
-      },
-    ],
-    answerKey: "spion",
-    planPart1: "/Fluchtplan1.png",
-    planPart2: "/Fluchtplan2.png",
-    planCompleteImage: "/Fluchtplan-komplett.png",
-    nextMapHint: {
-      lat: 48.28964348125478,
-      lng: 7.740355094937401,
-      radius: 120,
-      title: "ORIENTIERUNGSHILFE (NUR WENN IHR NICHT WEITERKOMMT)",
-    },
-    nextHintImage: "/hinweis5.jpeg",
-    nextHintText:
-      "Der vollständige Fluchtplan zeigt euch den Weg.\n\nSchaut ihn euch ganz genau an und folgt der Spur.\n\nNur wenn ihr wirklich nicht weiterkommt, könnt ihr euch hier einen kleinen Hinweis holen.",
-  },
+function buildPagesForLanguage(lang) {
+  const rawPages = mission.pages?.[lang] || mission.pages?.[DEFAULT_LANGUAGE] || [];
+  return rawPages.map((page) => localizePageMedia(page, lang, mission.assetBase));
+}
 
-  {
-    id: "station6",
-    type: "riddle",
-    title: "STATION 6:",
-    titleLine2: "DER GEHEIME TREFFPUNKT",
-    image: "/station6.jpeg",
-    storyBox:
-      "Der Spion bleibt stehen…\n\n„Ich weiß jetzt, warum der Meister hier war…“\n\nEr schaut sich um.\n\n„Er hat sich hier mit seinen Spionen getroffen,\num seinen Fluchtplan weiter zu besprechen…“\n\nEr senkt die Stimme.\n\n„Sie dachten, sie wären unbeobachtet…“\n\nEr macht eine kurze Pause.\n\n„Aber sie haben sich geirrt…“\n\nEr deutet in die Richtung.\n\n„Jemand hat alles gesehen…\nganz still… ganz versteckt…“\n\nEr flüstert:\n\n„Ein Tier…“\n\nDann schaut er euch an.\n\n„Findet heraus, welches.“",
-    taskTitle: "DAS VERSTECK",
-    taskText:
-      "Seht euch hier genau um.\n\nWo könnte man sich verstecken,\nohne sofort gesehen zu werden?\n\nSchaut euch dort ganz genau um…\n\nFindet das Tier,\ndas alles beobachtet hat.",
-    resultBox:
-      "Sehr gut!\n\nIhr habt den stillen Beobachter gefunden.\n\nDer Elefant wackelt geheimnisvoll hin und her…\n\nDer Spion beugt sich zu ihm.\n\n„Was? Wirklich?“\n\nDann schaut er euch an:\n\n„Der Elefant hat alles gesehen…“\n\nEr denkt kurz nach.\n\n„Moment…“\n\n„Das war nicht nur ein Versteck…“\n\n„Das war ihr Treffpunkt…\nund sie haben ihn mit diesem Tier markiert…“\n\nEr nickt langsam.\n\n„Das ist wichtig…“",
-   hint1Title: "Hinweis 1",
-hint1Text:
-  "Schaut euch an, wo man sich gut verstecken könnte…",
-hint1Image: "/hinweis6-treffpunkt-1.jpeg",
+const pagesByLanguage = SUPPORTED_LANGUAGES.reduce((acc, lang) => {
+  acc[lang] = buildPagesForLanguage(lang);
+  return acc;
+}, {});
 
-hint2Title: "Hinweis zum Treffpunkt",
-hint2ButtonText: "👀 Hinweis zum Treffpunkt anzeigen",
-hint2Text:
-  "Der Spion flüstert…\n\n„Nicht nur das Versteck ist wichtig…\nschaut euch auch darum herum um…“",
-hint2Image: "/hinweis6-treffpunkt-2.jpeg",
-    solutionText: "Die richtige Lösung ist: Elefant",
-    answerKey: "tier",
-    correctAnswers: ["elefant", "Elefant"],
-    placeholder: "Tier eingeben",
-    nextMapHint: {
-      lat: 48.28955781804192,
-      lng: 7.742026111057529,
-      radius: 60,
-      title: "ORIENTIERUNGSHILFE ZUR EIERKÖNIGIN",
-    },
-    nextHintImage: "/hinweis6.jpeg",
-    nextHintText:
-      "Der Spion flüstert:\n\n„Meister der Krümel ist zurück ins Wohngebiet geflüchtet.“\n\n„Der Elefant hat gehört, wie er etwas von einer Königin gemurmelt hat…\nund von Eiern.“\n\nFolgt seiner Spur zurück und haltet Ausschau nach der Eierkönigin.",
-  },
+const uiText = mission.uiText || {};
+const initialAnswers = mission.initialAnswers || {};
+const lockAnimals = mission.lock?.animals || [];
+const lockSymbols = mission.lock?.symbols || [];
 
-  {
-    id: "station7",
-    type: "riddle",
-    taskMode: "choice",
-    title: "STATION 7:",
-    titleLine2: "DIE KÖNIGIN",
-    image: "/station7.jpeg",
-    storyBox:
-      "Ihr seid wieder beim Haus mit der Eierkönigin angekommen.\n\nDer Spion bleibt stehen…\n\n„Das muss es sein…“\n\nEr schaut sich das Haus genau an.\n\n„Hier war er… ganz sicher.“\n\nEr wird leiser.\n\n„Wenn etwas schiefgeht…\nhinterlässt der Meister manchmal ein Zeichen…“\n\nEr schaut sich suchend um.\n\n„Nicht offen… sondern gut versteckt…“\n\n„Nur, wenn man ganz genau hinschaut…“\n\nDann sieht er euch an.\n\n„Vielleicht hat er auch hier etwas zurückgelassen…“",
-    taskTitle: "DAS NOTFALLZEICHEN",
-    taskText:
-      "Seht euch hier ganz genau um.\n\nFindet heraus,\nob der Meister hier ein Zeichen hinterlassen hat.\n\nWenn ja…\nwelches ist es?",
-choiceOptions: [
-  { value: "stern", label: "⭐ Stern" },
-  { value: "herz", label: "❤️ Herz" },
-  { value: "blume", label: "🌼 Blume" },
-  {
-    value: "sonne",
-    label: "☀️ Sonne",
-    resultBox:
-      "Ja!\n\nIhr habt das geheime Zeichen gefunden.\n\nDer Spion nickt euch zu.\n\n„Das ist es…“\n\nEr schaut sich noch einmal um.\n\n„Ab hier wird es zu gefährlich für mich…“\n\n„Ich muss zurück auf meinen Posten,\nbevor der Meister merkt, dass ich verschwunden bin…“\n\nEr tritt einen Schritt zurück.\n\n„Ihr seid jetzt auf euch allein gestellt.“\n\nDann flüstert er:\n\n„Der Meister weiß, dass ihr ihm dicht auf den Fersen seid…“\n\n„Er hat keine Zeit mehr…\ner ist panisch aus dem Ort geflohen…“\n\n„Los! Hinterher!“\n\nUnd plötzlich ist er verschwunden.",
-  },
-],
-answerKey: "symbol",
-hint1Title: "Hinweis 1",
-hint1Text:
-  "Schaut euch diese Seite mal etwas genauer an.",
-hint1Image: "/hinweis7-notfallzeichen-1.jpeg",
-hint2Title: "Hinweis 2",
-hint2ButtonText: "👀 Noch ein Hinweis zum Notfallzeichen",
-hint2Text:
-  "Ob der Meister wohl hier sein Notfallzeichen hinterlassen hat?",
-hint2Image: "/hinweis7-notfallzeichen-2.jpeg",
-solutionValue: "sonne",
-solutionText: "Die richtige Lösung ist: Sonne",
-    nextMapHint: {
-      lat: 48.288146724406005,
-      lng: 7.747724653451934,
-      radius: 100,
-      title: "ORIENTIERUNGSHILFE ZUR KEKSDOSE",
-    },
-    nextHintImage: "/hinweis7.jpeg",
-    nextHintText:
-      "Folgt seiner Spur aus dem Ort heraus.\n\nBeeilt euch…\n\nIhr seid ihm ganz nah!",
-  },
-
-  {
-    id: "finale",
-    type: "finale",
-    title: "STATION 8:",
-    titleLine2: "DIE VERSCHLOSSENE KEKSDOSE",
-    image: "/finale.jpeg",
-    storyBox:
-      "Ihr seid Meister der Krümel bis zum Ortsrand gefolgt…\n\nEr ist ganz nah.\n\nLauscht genau hin…",
-    taskTitle: "KNACKT DAS SCHLOSS",
-    audio: "/meister-flucht.mp3",
-    audioTitle: "🎧 Lauscht Meister der Krümel",
-    taskText:
-      "Auf der Dose ist ein besonderes Schloss.\n\nNur wer die richtige Kombination kennt,\nkann die Dose öffnen!\n\nErinnert euch an die drei wichtigsten Hinweise:\n\ndie Zahl, das Tier und das Zeichen.",
-    successBox:
-      "KLICK...\n\nDas Schloss springt auf!\n\nIhr öffnet vorsichtig die Dose...\n\n😳\n\nHIER IST SIE!\n\nDie geheime Keksformel!\n\nMeister der Krümel ist zwar entkommen...\n\naber das Wichtigste habt ihr gerettet!\n\n🎉 Glückwunsch, Detektive!",
-  },
-  {
-    id: "recipe",
-    type: "recipe",
-    title: "",
-    titleLine2: "",
-    outroText:
-      "Ihr habt die geheime Keksformel gerettet und Meister der Krümel bis zum Schluss verfolgt.\n\nEr ist zwar entkommen…\n\naber ohne das geheime Rezept!\n\nJetzt kann er nie wieder seine leckeren Kekse backen.\n\nDer Club der Keksliebhaber bedankt sich bei euch für eure Hilfe!",
-    photoText:
-  "📸 Wenn ihr möchtet, speichert euer Teamfoto als Erinnerung an euren Detektiv-Einsatz.\n\nDas Foto bleibt auf eurem Gerät und wird nicht automatisch an uns übertragen.",
-    reviewText:
-      "⭐ Wenn euch die Mission gefallen hat, freuen wir uns riesig über eine Bewertung.\n\nDas hilft anderen Familien, unser kleines Abenteuer zu entdecken – und vielleicht gibt es dann bald den nächsten Einsatz.",
-    returnText:
-      "Ihr steht jetzt fast wieder am Startpunkt.\n\nWenn ihr zurück zur Kirche möchtet, folgt einfach dem Weg zurück Richtung Ortsmitte – von hier aus ist es nur ein kurzes Stück.",
-    finalText:
-      "Bis zum nächsten Abenteuer, Detektive!\n\n🕵️‍♀️🍪🕵️",
-  },
-];
-
-const initialAnswers = {
-  helfer: "",
-  kraftprobe: "",
-  schleichmission: "",
-  untergrund: "",
-  spion: "",
-  tier: "",
-  symbol: "",
-};
-
-const lockAnimals = [
-  { label: "Katze", emoji: "🐱" },
-  { label: "Fuchs", emoji: "🦊" },
-  { label: "Elefant", emoji: "🐘" },
-  { label: "Hund", emoji: "🐶" },
-  { label: "Maus", emoji: "🐭" },
-  { label: "Löwe", emoji: "🦁" },
-  { label: "Affe", emoji: "🐵" },
-  { label: "Bär", emoji: "🐻" },
-  { label: "Frosch", emoji: "🐸" },
-];
-
-const lockSymbols = [
-  { label: "Ei", emoji: "🥚" },
-  { label: "Stern", emoji: "⭐" },
-  { label: "Herz", emoji: "❤️" },
-  { label: "Blume", emoji: "🌼" },
-  { label: "Sonne", emoji: "☀️" },
-  { label: "Wurst", emoji: "🌭" },
-  { label: "Ball", emoji: "⚽" },
-  { label: "Buch", emoji: "📘" },
-  { label: "Baum", emoji: "🌳" },
-];
 
 function normalize(value) {
   return String(value || "")
@@ -633,6 +306,7 @@ function normalize(value) {
     .replace(/ß/g, "ss");
 }
 const STORAGE_KEY = mission.storageKey;
+const LANGUAGE_STORAGE_KEY = mission.languageStorageKey || `${STORAGE_KEY}:language`;
 
 function loadSavedGame() {
   try {
@@ -696,8 +370,74 @@ async function redeemAccessCode({ code, missionSlug }) {
   return response.json();
 }
 
+function LanguageStartScreen({ onSelect }) {
+  return (
+    <>
+      <div style={styles.headerImageWrap}>
+        <img
+          src={languageAsset(DEFAULT_LANGUAGE, "/header.png", mission.assetBase)}
+          alt="Mission"
+          style={styles.headerImage}
+          onError={(e) => {
+            handleImageFallback(e);
+          }}
+        />
+      </div>
+
+      <div style={styles.accessCard}>
+        <div style={styles.accessTitle}>Sprache wählen</div>
+        <div style={styles.accessText}>
+          Choisir la langue · Choose your language
+        </div>
+
+        <div style={styles.languageChoiceGrid}>
+          {SUPPORTED_LANGUAGES.map((lang) => {
+            const config = LANGUAGE_CONFIG[lang];
+            return (
+              <button
+                key={lang}
+                type="button"
+                style={styles.languageChoiceButton}
+                onClick={() => onSelect(lang)}
+              >
+                <span style={styles.languageChoiceFlag}>{config.flag}</span>
+                <span>{config.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const savedGame = loadSavedGame();
+
+  const [language, setLanguageState] = useState(() => {
+    const savedLanguage =
+      savedGame?.language ||
+      (() => {
+        try {
+          return (
+            window.localStorage.getItem(LANGUAGE_STORAGE_KEY) ||
+            window.localStorage.getItem("detektiv_app_language")
+          );
+        } catch {
+          return null;
+        }
+      })();
+
+    return savedLanguage ? normalizeLanguage(savedLanguage) : null;
+  });
+
+  const languageIsSelected = Boolean(language);
+  const activeLanguage = language || DEFAULT_LANGUAGE;
+  const setLanguage = (nextLanguage) => setLanguageState(normalizeLanguage(nextLanguage));
+  const pages = pagesByLanguage[activeLanguage] || pagesByLanguage[DEFAULT_LANGUAGE];
+  const ui = uiText[activeLanguage] || uiText[DEFAULT_LANGUAGE];
+  const asset = (file) =>
+    languageAsset(activeLanguage, `/${String(file || "").replace(/^\/+/, "")}`, mission.assetBase);
   const hasSavedAccess = savedGame?.accessGranted === true;
   const [accessGranted, setAccessGranted] = useState(hasSavedAccess);
   const [isRedeemingCode, setIsRedeemingCode] = useState(false);
@@ -767,15 +507,25 @@ export default function App() {
 
   const currentAnimal = lockAnimals[lockAnimalIndex];
   const currentSymbol = lockSymbols[lockSymbolIndex];
-  const correctLeft = Number(answers.helfer) || 3;
-  const correctAnimalLabel = normalize(answers.tier) === "elefant" ? "Elefant" : "Elefant";
-  const correctSymbolLabel = normalize(answers.symbol) === "sonne" ? "Sonne" : "Sonne";
+  const getLocalizedOptionLabel = (item) => {
+    if (activeLanguage === "fr") return item.labelFr || item.label;
+    if (activeLanguage === "en") return item.labelEn || item.label;
+    return item.label;
+  };
+  const getLockAnimalLabel = getLocalizedOptionLabel;
+  const getLockSymbolLabel = getLocalizedOptionLabel;
+  const lockSolution = mission.lock?.solution || {};
+  const correctLeft = Number(lockSolution.number || 3);
+  const correctAnimalLabel = lockSolution.animal || "Elefant";
+  const correctSymbolLabel = lockSolution.symbol || "Sonne";
   const lockHintLevel = Math.min(lockAttempts, 3);
   const shouldShowTaskCard = !page.planImage || showPlan;
   const currentResultBox = selectedChoiceData?.resultBox || page.resultBox;
 
   const resetGameForTesting = () => {
     localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+        localStorage.removeItem("detektiv_app_language");
     window.location.reload();
   };
 
@@ -788,6 +538,8 @@ export default function App() {
       if (next >= 2) {
         if (window.confirm("Testmodus: Spiel wirklich neu starten?")) {
           localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+        localStorage.removeItem("detektiv_app_language");
           window.location.reload();
         }
         return 0;
@@ -804,6 +556,8 @@ export default function App() {
       if (next >= 7) {
         if (window.confirm("Testmodus: Spiel wirklich neu starten?")) {
           localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+        localStorage.removeItem("detektiv_app_language");
           window.location.reload();
         }
         return 0;
@@ -824,14 +578,15 @@ export default function App() {
   };
 
   const sendProblemReport = () => {
-    const subject = encodeURIComponent("Problem bei der Schnitzeljagd-App");
+    const subject = encodeURIComponent(ui.problemEmailSubject || "Problem bei der Schnitzeljagd-App");
     const body = encodeURIComponent(
-      `Station / Seite: ${problemStation || "-"}\n\n` +
-        `Gerät / Browser: ${problemDevice || "-"}\n\n` +
-        `Was ist passiert?\n${problemText || "-"}`
+      `${ui.problemStationLabel || "Station / Seite"}: ${problemStation || "-"}\n\n` +
+        `${ui.problemDeviceLabel || "Gerät / Browser"}: ${problemDevice || "-"}\n\n` +
+        `${ui.problemDescriptionLabel || "Was ist passiert?"}\n${problemText || "-"}`
     );
 
-    window.location.href = `mailto:info@der-spielzeugladen.de?subject=${subject}&body=${body}`;
+    const contactEmail = mission.contactEmail || "info@der-spielzeugladen.de";
+    window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`;
   };
 
   useEffect(() => {
@@ -841,10 +596,26 @@ export default function App() {
   }, [photoPreview]);
 
   useEffect(() => {
+    if (!language) return;
+
+    try {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+      window.localStorage.removeItem("detektiv_app_language");
+    } catch {}
+
+    try {
+      document.documentElement.lang = LANGUAGE_CONFIG[language]?.htmlLang || language;
+    } catch {}
+  }, [language]);
+
+  useEffect(() => {
+    if (!language) return;
+
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
+          language,
           accessGranted,
           currentPage,
           answers,
@@ -854,7 +625,7 @@ export default function App() {
     } catch {
       // Speicherung ist nicht verfügbar – die App läuft trotzdem weiter.
     }
-  }, [accessGranted, currentPage, answers, planAssembled]);
+  }, [language, accessGranted, currentPage, answers, planAssembled]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -910,21 +681,24 @@ export default function App() {
   const handleChoiceSelect = (value) => {
     if (!page.answerKey) return;
 
-    if (page.id === "station7" && value !== "sonne") {
+    const expectedChoiceValue = page.solutionValue || page.correctChoiceValue;
+    if (expectedChoiceValue && value !== expectedChoiceValue) {
       const wrongOption = page.choiceOptions?.find((option) => option.value === value);
-      const wrongLabel = wrongOption?.label?.replace(/[⭐❤️🌼☀️]/g, "").trim() || "Dieses Zeichen";
+      const fallbackWrongLabel =
+        activeLanguage === "fr" ? "Ce choix" : activeLanguage === "en" ? "This choice" : "Diese Auswahl";
+      const wrongLabel = wrongOption?.label?.replace(/[⭐❤️🌼☀️]/g, "").trim() || fallbackWrongLabel;
       setWrongChoice(value);
-      setChoiceError(`${wrongLabel} ist leider falsch. Schaut noch einmal genauer hin.`);
+      setChoiceError(`${wrongLabel} ${ui.choiceWrongSuffix}`);
       return;
     }
 
-    if (page.id === "station4" && value !== "fluchtplan") {
-      setChoiceError("Schaut euch den geheimen Fluchtplan noch einmal ganz genau an.");
+    if (page.requiredChoiceValue && value !== page.requiredChoiceValue) {
+      setChoiceError(page.wrongChoiceText || ui.fluchtplanWrong);
       return;
     }
 
-    if (page.id === "station5" && !photoPreview) {
-      setChoiceError("Macht zuerst ein Teamfoto mit dem Spion.");
+    if (page.requiresPhotoBeforeChoice && !photoPreview) {
+      setChoiceError(ui.needPhoto);
       return;
     }
 
@@ -932,7 +706,7 @@ export default function App() {
     setWrongChoice("");
     setAnswers((prev) => ({ ...prev, [page.answerKey]: value }));
 
-    if (page.id === "station4" && value === "fluchtplan") {
+    if (page.autoAdvanceOnChoiceValue && value === page.autoAdvanceOnChoiceValue) {
       nextPage();
       return;
     }
@@ -1031,9 +805,9 @@ export default function App() {
   const selectedSymbol = normalize(currentSymbol?.label);
 
   const isCorrect =
-    selectedNumber === 3 &&
-    selectedAnimal === normalize("Elefant") &&
-    selectedSymbol === normalize("Sonne");
+    selectedNumber === correctLeft &&
+    selectedAnimal === normalize(correctAnimalLabel) &&
+    selectedSymbol === normalize(correctSymbolLabel);
 
   if (isCorrect) {
     vibrate([80, 40, 120]);
@@ -1054,6 +828,11 @@ export default function App() {
   const unlockMission = async () => {
     if (isRedeemingCode) return;
 
+    if (!String(accessCode || "").trim()) {
+      setAccessError(ui.emptyCode);
+      return;
+    }
+
     setAccessError("");
     setIsRedeemingCode(true);
 
@@ -1070,9 +849,9 @@ export default function App() {
         return;
       }
 
-      setAccessError(result.message || "Der Einsatz-Code ist leider nicht korrekt.");
+      setAccessError(activeLanguage === "de" ? result.message || ui.invalidCode : ui.invalidCode);
     } catch {
-      setAccessError("Die Code-Prüfung ist gerade nicht erreichbar. Bitte versucht es erneut.");
+      setAccessError(ui.codeCheckUnavailable);
     } finally {
       setIsRedeemingCode(false);
     }
@@ -1126,15 +905,17 @@ export default function App() {
           </button>
         ) : null}
 
-        {page.type === "access" ? (
+        {!languageIsSelected ? (
+          <LanguageStartScreen onSelect={setLanguage} />
+        ) : page.type === "access" ? (
           <>
             <div style={styles.headerImageWrap}>
               <img
-                src="/header.png"
-                alt="Die verschwundene Keksformel"
+                src={asset("header.png")}
+                alt={`${page.title} ${page.titleLine2 || ""} ${page.titleLine3 || ""}`.trim()}
                 style={styles.headerImage}
                 onError={(e) => {
-                  e.currentTarget.style.display = "none";
+                  handleImageFallback(e);
                 }}
               />
             </div>
@@ -1146,9 +927,9 @@ export default function App() {
             </div>
 
             <div style={styles.accessCard}>
-              <div style={styles.accessTitle}>NUR FÜR ECHTE DETEKTIVE</div>
+              <div style={styles.accessTitle}>{ui.accessTitle}</div>
               <div style={styles.accessText}>
-                Gebt euren Einsatz-Code ein, um die Mission freizuschalten.
+                {ui.accessText}
               </div>
 
               <input
@@ -1156,12 +937,15 @@ export default function App() {
                 type="text"
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
-                placeholder="Einsatz-Code eingeben"
+                placeholder={ui.accessPlaceholder}
                 disabled={isRedeemingCode}
+                autoCorrect="off"
+                autoCapitalize="characters"
+                spellCheck="false"
               />
 
               <div style={styles.readyText}>
-                Seid ihr bereit, Meister der Krümel aufzuhalten?
+                {ui.readyText}
               </div>
 
               <button
@@ -1172,7 +956,7 @@ export default function App() {
                 onClick={unlockMission}
                 disabled={isRedeemingCode}
               >
-                {isRedeemingCode ? "⏳ CODE WIRD GEPRÜFT..." : "🔓 MISSION FREISCHALTEN"}
+                {isRedeemingCode ? ui.checkingCode : ui.unlockButton}
               </button>
 
               {accessError ? <div style={styles.accessErrorBox}>{accessError}</div> : null}
@@ -1184,6 +968,7 @@ export default function App() {
                 lng={page.mapHint.lng}
                 radius={page.mapHint.radius}
                 title={page.mapHint.title}
+                caption={ui.mapCaption}
               />
             ) : null}
           </>
@@ -1223,27 +1008,25 @@ export default function App() {
             {!arrivedAtStart ? (
               <>
                 <div style={styles.startLocationCard}>
-                  <div style={styles.startLocationTitle}>VOR DER MISSION</div>
+                  <div style={styles.startLocationTitle}>{ui.beforeMission}</div>
 
                   <div style={styles.startLocationText}>
-                    📍 Kirche in Kappel-Grafenhausen (Kappel)
+                    {ui.startPlace}
                   </div>
 
                   <div style={styles.startLocationAddress}>
-                    Rathausstraße 52, 77966
+                    {ui.startAddress}
                   </div>
 
                   <div style={styles.startLocationHint}>
-                    Begebt euch zuerst zu diesem Ort.
-                    <br />
-                    Sobald ihr dort angekommen seid, tippt auf:
+                    <TextLines text={ui.startHint} style={styles.startLocationHint} />
                   </div>
 
                   <button
                     style={styles.primaryButton}
                     onClick={() => setArrivedAtStart(true)}
                   >
-                    📍 Wir sind am Startpunkt
+                    {ui.atStart}
                   </button>
                 </div>
 
@@ -1253,7 +1036,7 @@ export default function App() {
                   rel="noopener noreferrer"
                   style={styles.startLocationLinkSmall}
                 >
-                  Startpunkt nicht gefunden? Route in Google Maps öffnen
+                  {ui.mapsLink}
                 </a>
               </>
             ) : null}
@@ -1268,7 +1051,7 @@ export default function App() {
                       alt="Detektiv Figur"
                       style={styles.startSideCharacter}
                       onError={(e) => {
-                        e.currentTarget.style.display = "none";
+                        handleImageFallback(e);
                       }}
                     />
                   </div>
@@ -1276,11 +1059,11 @@ export default function App() {
 
                 <div style={styles.mostWantedCard}>
                   <img
-                    src="/wanted.jpg"
+                    src={asset("wanted.jpg")}
                     alt="Meister der Krümel Most Wanted"
                     style={styles.mostWantedImage}
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      handleImageFallback(e);
                     }}
                   />
                 </div>
@@ -1307,7 +1090,7 @@ export default function App() {
                 ) : null}
 
                 <button style={styles.startButton} onClick={nextPage}>
-                  ➜ STARTET JETZT EURE MISSION!
+                  {ui.startMissionButton}
                 </button>
               </>
             ) : null}
@@ -1322,7 +1105,7 @@ export default function App() {
                   alt="Detektiv"
                   style={styles.characterImageClean}
                   onError={(e) => {
-                    e.currentTarget.style.display = "none";
+                    handleImageFallback(e);
                   }}
                 />
               </div>
@@ -1351,7 +1134,7 @@ export default function App() {
                     alt={page.titleLine2 || page.title}
                     style={styles.heroImage}
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      handleImageFallback(e);
                     }}
                   />
                 </div>
@@ -1392,17 +1175,17 @@ export default function App() {
                 {page.planImage && showPlan ? (
                   <div style={styles.heroCard}>
                     <div style={styles.heroImageInner}>
-                      <img
-                        src={page.planImage}
-                        alt="Fluchtplan"
-                        style={{ ...styles.heroImage, cursor: "zoom-in" }}
-                        onClick={() => openZoom(page.planImage, "Fluchtplan")}
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
+                   <img
+  src={page.planImage}
+  alt="Fluchtplan"
+  style={{ ...styles.heroImage, cursor: "zoom-in" }}
+  onClick={() => openZoom(page.planImage, activeLanguage === "fr" ? "Plan de fuite" : activeLanguage === "en" ? "Escape plan" : "Fluchtplan")}
+  onError={(e) => {
+    handleImageFallback(e);
+  }}
+/>
                     </div>
-                    <div style={styles.zoomHint}>Zum Vergrößern antippen</div>
+                    <div style={styles.zoomHint}>{ui.zoomHint}</div>
                   </div>
                 ) : null}
 
@@ -1410,15 +1193,13 @@ export default function App() {
                   <div style={styles.taskCard}>
                     <div style={styles.taskTitle}>{page.taskTitle}</div>
                     <TextLines text={page.taskText} style={styles.taskText} />
-                    {page.mapHint && !effectiveSolved && page.id !== "station4" ? (
+                    {page.mapHint && !effectiveSolved && !page.hideInlineMapHint ? (
                       <>
                         <button
                           style={styles.secondaryButton}
                           onClick={() => setShowTaskMap((prev) => !prev)}
                         >
-                          {showTaskMap
-                            ? "Orientierungshilfe ausblenden"
-                            : "🧭 Orientierungshilfe anzeigen"}
+                          {showTaskMap ? ui.hideOrientation : ui.showOrientation}
                         </button>
 
                         {showTaskMap ? (
@@ -1427,6 +1208,7 @@ export default function App() {
                             lng={page.mapHint.lng}
                             radius={page.mapHint.radius}
                             title={page.mapHint.title}
+                            caption={ui.mapCaption}
                           />
                         ) : null}
                       </>
@@ -1434,7 +1216,7 @@ export default function App() {
 
                     {isChoiceTask ? (
                       !effectiveSolved ? (
-                        page.id === "station4" ? (
+                        page.choiceLayout === "planHelp" ? (
                           <>
                             <>
   <div style={styles.choiceButtonGroup}>
@@ -1456,24 +1238,25 @@ export default function App() {
     <div style={styles.inlineErrorBox}>{choiceError}</div>
   ) : null}
 
-  {page.id === "station7" && !effectiveSolved ? (
+  {page.solutionValue && !effectiveSolved ? (
     <div style={styles.optionalHelpWrap}>
       {hintLevel === 0 ? (
         <>
           <div style={styles.subtleHintIntro}>
-            Nur anklicken, wenn ihr wirklich nicht weiterkommt:
+            {ui.helpIntro}
           </div>
           <button
             style={styles.secondaryButton}
             onClick={() => setHintLevel(1)}
           >
-            👀 Hinweis anzeigen
+            {ui.smallHint}
           </button>
         </>
       ) : null}
 
       {hintLevel === 1 ? (
         <HintCard
+          zoomHintText={ui.zoomHint}
           title={page.hint1Title}
           text={page.hint1Text}
           image={page.hint1Image}
@@ -1490,12 +1273,13 @@ export default function App() {
           style={styles.secondaryButton}
           onClick={() => setHintLevel(2)}
         >
-          {page.hint2ButtonText || "👀 Noch ein Hinweis"}
+          {page.hint2ButtonText || ui.moreHint}
         </button>
       ) : null}
 
       {hintLevel === 2 ? (
         <HintCard
+          zoomHintText={ui.zoomHint}
           title={page.hint2Title}
           text={page.hint2Text}
           image={page.hint2Image}
@@ -1513,7 +1297,7 @@ export default function App() {
           onClick={() => {
             setAnswers((prev) => ({
               ...prev,
-              [page.answerKey]: page.solutionValue || "sonne",
+              [page.answerKey]: page.solutionValue,
             }));
             setChoiceError("");
             setWrongChoice("");
@@ -1522,7 +1306,7 @@ export default function App() {
             setSolved(true);
           }}
         >
-          🔐 Lösung anzeigen
+          {ui.solution}
         </button>
       ) : null}
     </div>
@@ -1533,19 +1317,20 @@ export default function App() {
                               {hintLevel === 0 ? (
                                 <>
                                   <div style={styles.subtleHintIntro}>
-                                    Nur anklicken, wenn ihr wirklich nicht weiterkommt:
+                                    {ui.helpIntro}
                                   </div>
                                   <button
                                     style={styles.secondaryButton}
                                     onClick={() => setHintLevel(1)}
                                   >
-                                    👀 Wir brauchen Hilfe beim Fluchtplan
+                                    {ui.planHelpButton}
                                   </button>
                                 </>
                               ) : null}
 
                               {hintLevel >= 1 ? (
                                 <HintCard
+          zoomHintText={ui.zoomHint}
                                   title={page.hint1Title}
                                   text={page.hint1Text}
                                   image={page.hint1Image}
@@ -1557,12 +1342,13 @@ export default function App() {
                                   style={styles.secondaryButton}
                                   onClick={() => setHintLevel(2)}
                                 >
-                                  👀 Noch ein Tipp zum Fluchtplan
+                                  {page.hint2ButtonText || ui.moreHint}
                                 </button>
                               ) : null}
 
                               {hintLevel >= 2 ? (
                                 <HintCard
+          zoomHintText={ui.zoomHint}
                                   title={page.hint2Title}
                                   text={page.hint2Text}
                                   image={page.hint2Image}
@@ -1582,9 +1368,7 @@ export default function App() {
                                   style={styles.secondaryButton}
                                   onClick={() => setShowTaskMap((prev) => !prev)}
                                 >
-                                  {showTaskMap
-                                    ? "Orientierungshilfe ausblenden"
-                                    : "🧭 Orientierungshilfe anzeigen"}
+                                  {showTaskMap ? ui.hideOrientation : ui.showOrientation}
                                 </button>
 
                                 {showTaskMap ? (
@@ -1593,6 +1377,7 @@ export default function App() {
                                     lng={page.mapHint.lng}
                                     radius={page.mapHint.radius}
                                     title={page.mapHint.title}
+                                    caption={ui.mapCaption}
                                   />
                                 ) : null}
                               </>
@@ -1630,16 +1415,14 @@ export default function App() {
                     {isPhotoChoiceTask ? (
                       <>
                         <div style={styles.photoInfoBox}>
-                          📷 Das Foto bleibt nur auf eurem Gerät. Die App zeigt es nur als Vorschau.
-                          <br />
-                          Tipp: Nach dem Foto könnt ihr es zusätzlich speichern/herunterladen.
+                          <TextLines text={ui.photoInfo} style={styles.photoInfoText} />
                         </div>
 
                         {!effectiveSolved ? (
                           <>
                           <div style={{ display: "grid", gap: "10px", marginBottom: "14px" }}>
   <label style={styles.uploadButton}>
-    📸 Teamfoto aufnehmen
+    {ui.photoTake}
     <input
       type="file"
       accept="image/*"
@@ -1658,7 +1441,7 @@ export default function App() {
       boxShadow: "none",
     }}
   >
-    🖼️ Foto aus Galerie auswählen
+    {ui.photoGallery}
     <input
       type="file"
       accept="image/*"
@@ -1681,11 +1464,11 @@ export default function App() {
                                   download="teamfoto-spion.jpg"
                                   style={styles.downloadSmallButton}
                                 >
-                                  💾 Foto auf Gerät speichern
+                                  {ui.photoSave}
                                 </a>
 
                                 <button style={styles.secondaryButton} onClick={removePhoto}>
-                                  Foto nochmal machen
+                                  {ui.photoRetry}
                                 </button>
                               </div>
                             ) : null}
@@ -1724,7 +1507,7 @@ export default function App() {
                                   download="teamfoto-spion.jpg"
                                   style={styles.downloadSmallButton}
                                 >
-                                  💾 Foto auf Gerät speichern
+                                  {ui.photoSave}
                                 </a>
                               </div>
                             ) : null}
@@ -1749,13 +1532,13 @@ export default function App() {
 
                         {!effectiveSolved ? (
                           <button style={styles.primaryButton} onClick={checkAnswer}>
-                            Antwort prüfen
+                            {ui.answerCheck}
                           </button>
                         ) : null}
 
                         {answerError && !effectiveSolved ? (
                           <div style={styles.inlineErrorBox}>
-                            Hmm… das scheint noch nicht ganz zu stimmen.
+                            {ui.answerWrong}
                           </div>
                         ) : null}
 
@@ -1764,12 +1547,13 @@ export default function App() {
                             style={styles.secondaryButton}
                             onClick={() => setHintLevel(1)}
                           >
-                            👀 Ein kleiner Hinweis
+                            {ui.smallHint}
                           </button>
                         ) : null}
 
                    {hintLevel === 1 && !effectiveSolved ? (
   <HintCard
+          zoomHintText={ui.zoomHint}
     title={page.hint1Title}
     text={page.hint1Text}
     image={page.hint1Image}
@@ -1781,12 +1565,13 @@ export default function App() {
     style={styles.secondaryButton}
     onClick={() => setHintLevel(2)}
   >
-    {page.hint2ButtonText || "👀 Noch ein Tipp anzeigen"}
+    {page.hint2ButtonText || ui.moreHint}
   </button>
 ) : null}
 
                         {hintLevel === 2 && !effectiveSolved ? (
   <HintCard
+          zoomHintText={ui.zoomHint}
     title={page.hint2Title}
     text={page.hint2Text}
     image={page.hint2Image}
@@ -1795,7 +1580,7 @@ export default function App() {
 
                         {hintLevel >= 2 && !effectiveSolved ? (
                           <button style={styles.secondaryButton} onClick={revealSolution}>
-                            Lösung anzeigen
+                            {ui.solution}
                           </button>
                         ) : null}
 
@@ -1804,24 +1589,25 @@ export default function App() {
                     ) : null}
                   </div>
                 ) : null}
-{page.id === "station7" && !effectiveSolved ? (
+{page.solutionValue && !effectiveSolved ? (
   <div style={styles.optionalHelpWrap}>
     {hintLevel === 0 ? (
       <>
         <div style={styles.subtleHintIntro}>
-          Nur anklicken, wenn ihr wirklich nicht weiterkommt:
+          {ui.helpIntro}
         </div>
         <button
           style={styles.secondaryButton}
           onClick={() => setHintLevel(1)}
         >
-          👀 Hinweis anzeigen
+          {ui.smallHint}
         </button>
       </>
     ) : null}
 
     {hintLevel === 1 ? (
       <HintCard
+          zoomHintText={ui.zoomHint}
         title={page.hint1Title}
         text={page.hint1Text}
         image={page.hint1Image}
@@ -1838,12 +1624,13 @@ export default function App() {
         style={styles.secondaryButton}
         onClick={() => setHintLevel(2)}
       >
-        {page.hint2ButtonText || "👀 Noch ein Hinweis"}
+        {page.hint2ButtonText || ui.moreHint}
       </button>
     ) : null}
 
     {hintLevel === 2 ? (
       <HintCard
+          zoomHintText={ui.zoomHint}
         title={page.hint2Title}
         text={page.hint2Text}
         image={page.hint2Image}
@@ -1861,7 +1648,7 @@ export default function App() {
         onClick={() => {
           setAnswers((prev) => ({
             ...prev,
-            [page.answerKey]: page.solutionValue || "sonne",
+            [page.answerKey]: page.solutionValue,
           }));
           setChoiceError("");
           setWrongChoice("");
@@ -1870,7 +1657,7 @@ export default function App() {
           setSolved(true);
         }}
       >
-        🔐 Lösung anzeigen
+        {ui.solution}
       </button>
     ) : null}
   </div>
@@ -1879,27 +1666,28 @@ export default function App() {
                   <TextLines text={currentResultBox} style={styles.resultBox} />
                 ) : null}
 
-                {effectiveSolved && page.id === "station5" ? (
-                  <PlanAssembly
-                    part1={page.planPart1}
-                    part2={page.planPart2}
-                    completeImage={page.planCompleteImage}
-                    assembled={planAssembled}
-                    onAssemble={() => setPlanAssembled(true)}
-                    onZoom={openZoom}
+                {effectiveSolved && page.showPlanAssemblyAfterChoice ? (
+                 <PlanAssembly
+  part1={page.planPart1}
+  part2={page.planPart2}
+  completeImage={page.planCompleteImage}
+  assembled={planAssembled}
+  onAssemble={() => setPlanAssembled(true)}
+  onZoom={openZoom}
+                    ui={ui}
                   />
                 ) : null}
 
                 {effectiveSolved &&
                 page.nextHintImage &&
-                (page.id !== "station5" || planAssembled) ? (
+                (!page.requiresPlanAssemblyBeforeNext || planAssembled) ? (
                   <div style={styles.nextHintBox}>
                     <img
                       src="/fussabdruecke.png"
                       alt=""
                       style={styles.footprintsTop}
                       onError={(e) => {
-                        e.currentTarget.style.display = "none";
+                        handleImageFallback(e);
                       }}
                     />
 
@@ -1913,15 +1701,15 @@ export default function App() {
                         }}
                         onClick={
                           page.nextHintZoomable
-                            ? () => openZoom(page.nextHintImage, "Geheimer Hinweis")
+                            ? () => openZoom(page.nextHintImage, ui.secretHintTitle)
                             : undefined
                         }
                         onError={(e) => {
-                          e.currentTarget.style.display = "none";
+                          handleImageFallback(e);
                         }}
                       />
                       {page.nextHintZoomable ? (
-                        <div style={styles.zoomHint}>Zum Vergrößern antippen</div>
+                        <div style={styles.zoomHint}>{ui.zoomHint}</div>
                       ) : null}
                     </div>
 
@@ -1933,9 +1721,7 @@ export default function App() {
                           style={styles.secondaryButton}
                           onClick={() => setShowNextMap((prev) => !prev)}
                         >
-                          {showNextMap
-                            ? "Orientierungshilfe ausblenden"
-                            : "🧭 Orientierungshilfe anzeigen"}
+                          {showNextMap ? ui.hideOrientation : ui.showOrientation}
                         </button>
 
                         {showNextMap ? (
@@ -1944,6 +1730,7 @@ export default function App() {
                             lng={page.nextMapHint.lng}
                             radius={page.nextMapHint.radius}
                             title={page.nextMapHint.title}
+                            caption={ui.mapCaption}
                           />
                         ) : null}
                       </>
@@ -1954,7 +1741,7 @@ export default function App() {
                       alt=""
                       style={styles.footprintsBottom}
                       onError={(e) => {
-                        e.currentTarget.style.display = "none";
+                        handleImageFallback(e);
                       }}
                     />
                   </div>
@@ -1990,7 +1777,7 @@ export default function App() {
                     ) : null}
 
                     <TextLines
-                      text={"Plötzlich wird es still…\n\nWas war das?"}
+                      text={ui.finaleQuietText}
                       style={styles.storyBox}
                     />
 
@@ -1998,7 +1785,7 @@ export default function App() {
                       style={styles.primaryButton}
                       onClick={() => setFinaleRevealShown(true)}
                     >
-                      🔎 Nachsehen
+                      {ui.finaleLookButton}
                     </button>
                   </>
                 ) : null}
@@ -2008,18 +1795,18 @@ export default function App() {
                     <div style={styles.heroCard}>
                       <div style={styles.heroImageInner}>
                         <img
-                          src="/keksdose.png"
+                          src={asset("keksdose.png")}
                           alt="Keksdose auf dem Weg"
                           style={styles.heroImage}
                           onError={(e) => {
-                            e.currentTarget.style.display = "none";
+                            handleImageFallback(e);
                           }}
                         />
                       </div>
                     </div>
 
                     <TextLines
-                      text={"Da liegt etwas…\n\nEine alte Keksdose.\n\nSie ist verschlossen."}
+                      text={ui.finaleBoxText}
                       style={styles.storyBox}
                     />
 
@@ -2027,7 +1814,7 @@ export default function App() {
                       style={styles.primaryButton}
                       onClick={() => setFinaleLockShown(true)}
                     >
-                      🔒 Schloss untersuchen
+                      {ui.finaleInspectLockButton}
                     </button>
                   </>
                 ) : null}
@@ -2044,39 +1831,39 @@ export default function App() {
                         bottomValue={getNumberBelow(lockLeft)}
                         onUp={() => {
                           playSound("/wheel.mp3", 0.25);
-                          setLockLeft((prev) => stepNumber(prev, "down"));
+                          setLockLeft((prev) => stepNumber(prev, "up"));
                         }}
                         onDown={() => {
                           playSound("/wheel.mp3", 0.25);
-                          setLockLeft((prev) => stepNumber(prev, "up"));
+                          setLockLeft((prev) => stepNumber(prev, "down"));
                         }}
                       />
 
                       <LockWheel
-                        topValue={`${getItemAbove(lockAnimals, lockAnimalIndex).emoji} ${getItemAbove(lockAnimals, lockAnimalIndex).label}`}
-                        value={`${currentAnimal.emoji} ${currentAnimal.label}`}
-                        bottomValue={`${getItemBelow(lockAnimals, lockAnimalIndex).emoji} ${getItemBelow(lockAnimals, lockAnimalIndex).label}`}
+                        topValue={`${getItemAbove(lockAnimals, lockAnimalIndex).emoji} ${getLockAnimalLabel(getItemAbove(lockAnimals, lockAnimalIndex))}`}
+                        value={`${currentAnimal.emoji} ${getLockAnimalLabel(currentAnimal)}`}
+                        bottomValue={`${getItemBelow(lockAnimals, lockAnimalIndex).emoji} ${getLockAnimalLabel(getItemBelow(lockAnimals, lockAnimalIndex))}`}
                         onUp={() => {
-                          playSound("/wheel.mp3", 0.25);
-                          setLockAnimalIndex((prev) => stepList(prev, "down", lockAnimals));
-                        }}
-                        onDown={() => {
                           playSound("/wheel.mp3", 0.25);
                           setLockAnimalIndex((prev) => stepList(prev, "up", lockAnimals));
                         }}
+                        onDown={() => {
+                          playSound("/wheel.mp3", 0.25);
+                          setLockAnimalIndex((prev) => stepList(prev, "down", lockAnimals));
+                        }}
                       />
 
                       <LockWheel
-                        topValue={`${getItemAbove(lockSymbols, lockSymbolIndex).emoji} ${getItemAbove(lockSymbols, lockSymbolIndex).label}`}
-                        value={`${currentSymbol.emoji} ${currentSymbol.label}`}
-                        bottomValue={`${getItemBelow(lockSymbols, lockSymbolIndex).emoji} ${getItemBelow(lockSymbols, lockSymbolIndex).label}`}
+                        topValue={`${getItemAbove(lockSymbols, lockSymbolIndex).emoji} ${getLockSymbolLabel(getItemAbove(lockSymbols, lockSymbolIndex))}`}
+                        value={`${currentSymbol.emoji} ${getLockSymbolLabel(currentSymbol)}`}
+                        bottomValue={`${getItemBelow(lockSymbols, lockSymbolIndex).emoji} ${getLockSymbolLabel(getItemBelow(lockSymbols, lockSymbolIndex))}`}
                         onUp={() => {
                           playSound("/wheel.mp3", 0.25);
-                          setLockSymbolIndex((prev) => stepList(prev, "down", lockSymbols));
+                          setLockSymbolIndex((prev) => stepList(prev, "up", lockSymbols));
                         }}
                         onDown={() => {
                           playSound("/wheel.mp3", 0.25);
-                          setLockSymbolIndex((prev) => stepList(prev, "up", lockSymbols));
+                          setLockSymbolIndex((prev) => stepList(prev, "down", lockSymbols));
                         }}
                       />
                     </div>
@@ -2089,12 +1876,12 @@ export default function App() {
                       onClick={tryOpenLock}
                       disabled={lockOpened}
                     >
-                      {lockOpened ? "🔓 Schloss geöffnet" : "🔒 Schloss öffnen"}
+                      {lockOpened ? ui.lockOpened : ui.lockOpen}
                     </button>
 
                     {!lockOpened && lockAttempts >= 1 ? (
                       <div style={styles.inlineErrorBox}>
-                        Das ist leider nicht ganz richtig. Versucht es noch einmal.
+                        {ui.lockWrong}
                       </div>
                     ) : null}
 
@@ -2103,19 +1890,15 @@ export default function App() {
                         style={styles.secondaryButton}
                         onClick={() => setShowLockHint1(true)}
                       >
-                        👀 Hinweis 1 anzeigen
+                        {ui.lockHint1Button}
                       </button>
                     ) : null}
 
                     {!lockOpened && showLockHint1 ? (
                       <div style={styles.lockHintBox}>
-                        <div style={styles.lockHintTitle}>Hinweis 1</div>
+                        <div style={styles.lockHintTitle}>{ui.lockHint1Title}</div>
                         <div>
-                          Erinnert euch:
-                          <br />
-                          Ihr braucht die erste Zahl, das geheime Tier und das geheime Zeichen.
-                          <br />
-                          Denkt an die kleinen Helfer, das Tier vom Spielplatz und das Zeichen von Meister der Krümel.
+                          <TextLines text={ui.lockHint1Text} style={styles.lockHintText} />
                         </div>
                       </div>
                     ) : null}
@@ -2125,19 +1908,15 @@ export default function App() {
                         style={styles.secondaryButton}
                         onClick={() => setShowLockHint2(true)}
                       >
-                        👀 Hinweis 2 anzeigen
+                        {ui.lockHint2Button}
                       </button>
                     ) : null}
 
                     {!lockOpened && showLockHint2 ? (
                       <div style={styles.lockHintBox}>
-                        <div style={styles.lockHintTitle}>Hinweis 2</div>
+                        <div style={styles.lockHintTitle}>{ui.lockHint2Title}</div>
                         <div>
-                          Die erste Zahl ist die Anzahl der kleinen Helfer.
-                          <br />
-                          In der Mitte gehört das Tier, das alles beobachtet hat.
-                          <br />
-                          Rechts gehört das Zeichen, das Meister der Krümel bei der Eierkönigin hinterlassen hat.
+                          <TextLines text={ui.lockHint2Text} style={styles.lockHintText} />
                         </div>
                       </div>
                     ) : null}
@@ -2147,17 +1926,15 @@ export default function App() {
                         style={styles.secondaryButton}
                         onClick={() => setShowLockSolution(true)}
                       >
-                        🔐 Lösung anzeigen
+                        {ui.solution}
                       </button>
                     ) : null}
 
                     {!lockOpened && showLockSolution ? (
                       <div style={styles.lockSolutionBox}>
-                        <div style={styles.lockHintTitle}>Lösung</div>
+                        <div style={styles.lockHintTitle}>{ui.lockSolutionTitle}</div>
                         <div>
-                          Die richtige Kombination ist:
-                          <br />
-                          <strong>3 – 🐘 Elefant – ☀️ Sonne</strong>
+                          <TextLines text={ui.lockSolutionText} style={styles.lockHintText} />
                         </div>
                       </div>
                     ) : null}
@@ -2167,22 +1944,22 @@ export default function App() {
                         <TextLines text={page.successBox} style={styles.lockSuccessBox} />
 
                         <div style={styles.formulaRevealCard}>
-                          <div style={styles.formulaRevealTitle}>🍪 DIE GEHEIME KEKSFORMEL</div>
+                          <div style={styles.formulaRevealTitle}>{ui.formulaTitle}</div>
                           <div style={styles.formulaImageWrap}>
                             <img
-                              src="/keksformel.png"
+                              src={asset("keksformel.png")}
                               alt="Die geheime Keksformel"
                               style={styles.formulaImage}
-                              onClick={() => openZoom("/keksformel.png", "Die geheime Keksformel")}
+                              onClick={() => openZoom(asset("keksformel.png"), ui.formulaTitle)}
                               onError={(e) => {
-                                e.currentTarget.style.display = "none";
+                                handleImageFallback(e);
                               }}
                             />
                           </div>
-                          <div style={styles.zoomHint}>Zum Vergrößern antippen</div>
+                          <div style={styles.zoomHint}>{ui.zoomHint}</div>
 
-                          <a href="/keksformel.pdf" download style={styles.downloadButton}>
-                            📄 Keksformel herunterladen
+                          <a href={asset("keksformel.pdf")} download style={styles.downloadButton}>
+                            {ui.formulaDownload}
                           </a>
                         </div>
                       </>
@@ -2196,39 +1973,40 @@ export default function App() {
               <div style={styles.stackGap}>
                 <div style={styles.outroHeroCard}>
                   <div style={styles.outroEmoji}>🎉</div>
-                  <div style={styles.outroTitle}>Mission abgeschlossen!</div>
+                  <div style={styles.outroTitle}>{ui.missionCompletedTitle}</div>
                   <TextLines text={page.outroText} style={styles.outroText} />
                 </div>
 
                 <div style={styles.outroCard}>
-                  <div style={styles.outroCardTitle}>Euer Teamfoto</div>
+                  <div style={styles.outroCardTitle}>{ui.teamPhotoTitle}</div>
                   <TextLines text={page.photoText} style={styles.outroSmallText} />
+
 
                 </div>
 
                 <div style={styles.outroCard}>
-                  <div style={styles.outroCardTitle}>Hat euch die Mission gefallen?</div>
+                  <div style={styles.outroCardTitle}>{ui.reviewTitle}</div>
                   <TextLines text={page.reviewText} style={styles.outroSmallText} />
 
                   <a
-                    href="https://g.page/r/CYxuAwRA_viKEBM/review"
+                    href={mission.reviewUrl || "https://g.page/r/CYxuAwRA_viKEBM/review"}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={styles.reviewButton}
                   >
-                    ⭐ Bewertung bei Google abgeben
+                    {ui.reviewButton}
                   </a>
                 </div>
 
                 <div style={styles.outroCard}>
-                  <div style={styles.outroCardTitle}>Zurück zum Startpunkt</div>
+                  <div style={styles.outroCardTitle}>{ui.returnTitle}</div>
                   <TextLines text={page.returnText} style={styles.outroSmallText} />
                 </div>
 
                 <div style={styles.outroRestartCard}>
                   <TextLines text={page.finalText} style={styles.outroRestartText} />
                   <button type="button" style={styles.restartMissionButton} onClick={resetGameForTesting}>
-                    🔁 Diese Mission nochmal starten
+                    {ui.restartButton}
                   </button>
                 </div>
               </div>
@@ -2238,11 +2016,11 @@ export default function App() {
               {currentPage < pages.length - 1 &&
               (page.type === "finale"
                 ? lockOpened
-                : page.id === "station5"
+                : page.requiresPlanAssemblyBeforeNext
                 ? effectiveSolved && planAssembled
                 : page.type !== "riddle" || effectiveSolved) ? (
                 <button style={styles.primaryButton} onClick={nextPage}>
-                  Weiter
+                  {ui.next}
                 </button>
               ) : null}
             </div>
@@ -2250,11 +2028,11 @@ export default function App() {
         )}
         <div style={styles.footerLinks}>
           <button type="button" onClick={() => openInfo("impressum")} style={styles.footerLink}>
-            Impressum
+            {ui.footerImpressum}
           </button>
           <span> | </span>
           <button type="button" onClick={() => openInfo("datenschutz")} style={styles.footerLink}>
-            Datenschutz
+            {ui.footerDatenschutz}
           </button>
         </div>
       </div>
@@ -2278,31 +2056,31 @@ export default function App() {
               </button>
               <div style={styles.infoModalTitle}>
                 {activeInfoPage === "menu"
-                  ? "Menü"
+                  ? ui.menuTitle
                   : activeInfoPage === "impressum"
-                  ? "Impressum"
+                  ? ui.footerImpressum
                   : activeInfoPage === "datenschutz"
-                  ? "Datenschutz"
+                  ? ui.footerDatenschutz
                   : activeInfoPage === "faq"
-                  ? "FAQ"
-                  : "Problem melden"}
+                  ? ui.faqTitle
+                  : ui.problemTitle}
               </div>
             </div>
 
             {activeInfoPage === "menu" ? (
               <div style={styles.infoMenuList}>
                 <button style={styles.infoMenuItem} onClick={() => setActiveInfoPage("faq")}>
-                  ❓ FAQs
+                  ❓ {ui.faqTitle}
                 </button>
                 <button style={styles.infoMenuItem} onClick={() => setActiveInfoPage("problem")}>
-                  🛠 Problem melden
+                  🛠 {ui.problemTitle}
                 </button>
               </div>
             ) : null}
 
             {activeInfoPage === "impressum" ? (
               <div style={styles.infoContent}>
-                <p><strong>Impressum</strong></p>
+                <p><strong>{ui.footerImpressum}</strong></p>
                 <p>
                   der-spielzeugladen.de OHG<br />
                   Südend 1<br />
@@ -2335,64 +2113,57 @@ export default function App() {
 
             {activeInfoPage === "datenschutz" ? (
               <div style={styles.infoContent}>
-                <p><strong>Datenschutzhinweis</strong></p>
-                <p>
-                  Diese App speichert den Spielfortschritt lokal auf dem Gerät, damit die Mission
-                  bei einem versehentlichen Schließen fortgesetzt werden kann.
-                </p>
-                <p>
-                  Das Teamfoto bleibt auf dem jeweiligen Gerät und wird nicht automatisch an uns übertragen.
-                </p>
-                <p>Hier kannst du später deine vollständige Datenschutzerklärung einfügen.</p>
+                <p><strong>{ui.privacyHeading}</strong></p>
+                <p>{ui.privacyText1}</p>
+                <p>{ui.privacyText2}</p>
+                <p>{ui.privacyText3}</p>
               </div>
             ) : null}
 
             {activeInfoPage === "faq" ? (
               <div style={styles.infoContent}>
-                <p><strong>Häufige Fragen</strong></p>
-                <p><strong>Was tun, wenn wir nicht weiterkommen?</strong><br />
-                Nutzt zuerst die Hinweise in der jeweiligen Station.</p>
-                <p><strong>Was passiert mit dem Teamfoto?</strong><br />
-                Das Foto bleibt auf eurem Gerät. Die App zeigt es nur als Vorschau.</p>
-                <p><strong>Wie lange dauert die Mission?</strong><br />
-                Plant ungefähr 60 Minuten ein.</p>
+                <p><strong>{ui.faqHeading}</strong></p>
+                {(ui.faqItems || []).map((item) => (
+                  <p key={item.question}>
+                    <strong>{item.question}</strong><br />
+                    {item.answer}
+                  </p>
+                ))}
               </div>
             ) : null}
 
             {activeInfoPage === "problem" ? (
               <div style={styles.infoContent}>
-                <p><strong>Problem melden</strong></p>
-                <p>
-                  Wenn etwas nicht funktioniert, könnt ihr uns hier direkt eine kurze Meldung vorbereiten.
-                </p>
+                <p><strong>{ui.problemTitle}</strong></p>
+                <p>{ui.problemIntro}</p>
 
                 <label style={styles.infoFormLabel}>
-                  Station / Seite
+                  {ui.problemStationLabel}
                   <input
                     style={styles.infoFormInput}
                     value={problemStation}
                     onChange={(e) => setProblemStation(e.target.value)}
-                    placeholder="z. B. Station 5 / Schloss / Startseite"
+                    placeholder={ui.problemStationPlaceholder}
                   />
                 </label>
 
                 <label style={styles.infoFormLabel}>
-                  Gerät / Browser
+                  {ui.problemDeviceLabel}
                   <input
                     style={styles.infoFormInput}
                     value={problemDevice}
                     onChange={(e) => setProblemDevice(e.target.value)}
-                    placeholder="z. B. iPhone Safari, Android Chrome"
+                    placeholder={ui.problemDevicePlaceholder}
                   />
                 </label>
 
                 <label style={styles.infoFormLabel}>
-                  Was ist passiert?
+                  {ui.problemDescriptionLabel}
                   <textarea
                     style={styles.infoFormTextarea}
                     value={problemText}
                     onChange={(e) => setProblemText(e.target.value)}
-                    placeholder="Beschreibt kurz, was nicht funktioniert hat."
+                    placeholder={ui.problemDescriptionPlaceholder}
                   />
                 </label>
 
@@ -2401,12 +2172,11 @@ export default function App() {
                   style={styles.problemSendButton}
                   onClick={sendProblemReport}
                 >
-                  ✉️ Problem per E-Mail melden
+                  {ui.problemSendButton}
                 </button>
 
                 <p style={styles.infoSmallNote}>
-                  Hinweis: Es öffnet sich euer E-Mail-Programm. Die Nachricht wird erst versendet,
-                  wenn ihr sie dort abschickt.
+                  {ui.problemSmallNote}
                 </p>
               </div>
             ) : null}
@@ -2420,6 +2190,60 @@ export default function App() {
 }
 
 const styles = {
+
+  languageSwitch: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "8px",
+    marginBottom: "10px",
+  },
+  languageButton: {
+    border: "2px solid #d8bf98",
+    background: "#fff",
+    color: "#5a4a3e",
+    borderRadius: "999px",
+    padding: "7px 12px",
+    fontSize: "13px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
+  languageButtonActive: {
+    background: "#3f6f1d",
+    color: "#fff",
+    border: "2px solid #3f6f1d",
+  },
+  languageChoiceGrid: {
+    display: "grid",
+    gap: "10px",
+    marginTop: "16px",
+  },
+  languageChoiceButton: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    width: "100%",
+    border: "2px solid #d8bf98",
+    background: "#fff",
+    color: "#2c2015",
+    borderRadius: "18px",
+    padding: "14px 16px",
+    fontSize: "18px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
+  languageChoiceFlag: {
+    fontSize: "24px",
+    lineHeight: 1,
+  },
+  photoInfoText: {
+    fontSize: "15px",
+    lineHeight: 1.35,
+    textAlign: "center",
+  },
+  lockHintText: {
+    whiteSpace: "pre-line",
+  },
   page: {
     minHeight: "100vh",
     background: "linear-gradient(180deg, #f5ead9 0%, #efe0cb 100%)",
